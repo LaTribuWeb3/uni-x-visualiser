@@ -1,0 +1,98 @@
+const tokens = [
+  {
+    address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    name: "WETH",
+    decimals: 18,
+  },
+  {
+    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    name: "USDC",
+    decimals: 6,
+  },
+  {
+    address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    name: "USDT",
+    decimals: 6,
+  },
+  {
+    address: "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+    name: "PEPE",
+    decimals: 18,
+  },
+  {
+    address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+    name: "WBTC",
+    decimals: 8,
+  },
+  {
+    address: "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
+    name: "MATIC",
+    decimals: 18,
+  },
+  {
+    address: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    name: "DAI",
+    decimals: 18,
+  },
+  {
+    address: "0xaea46A60368A7bD060eec7DF8CBa43b7EF41Ad85",
+    name: "FETCH",
+    decimals: 18,
+  },
+  {
+    address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    name: "UNI",
+    decimals: 18,
+  },
+  {
+    address: "0xfAbA6f8e4a5E8Ab82F62fe7C39859FA577269BE3",
+    name: "ONDO",
+    decimals: 18,
+  },
+  {
+    address: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+    name: "LINK",
+    decimals: 18,
+  },
+  {
+    address: "0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C",
+    name: "SPX",
+    decimals: 8,
+  },
+];
+
+export const getTokenName = (tokenAddress: string) => {
+  return tokens.find((token) => token.address === tokenAddress)?.name || "Unknown";
+};
+
+export const getTokenDecimals = (tokenAddress: string) => {
+  return tokens.find((token) => token.address === tokenAddress)?.decimals || 18;
+};
+
+export const formatVolume = (value: number): { display: string; full: string } => {
+  if (value === 0) return { display: '0', full: '0' };
+  
+  const absValue = Math.abs(value);
+  let display: string;
+  let full: string;
+  
+  if (absValue >= 1e9) {
+    display = `${(value / 1e9).toFixed(2)}B`;
+    full = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  } else if (absValue >= 1e6) {
+    display = `${(value / 1e6).toFixed(2)}M`;
+    full = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  } else if (absValue >= 1e3) {
+    display = `${(value / 1e3).toFixed(2)}K`;
+    full = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  } else if (absValue >= 1) {
+    display = value.toFixed(2);
+    full = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  } else {
+    display = value.toFixed(6);
+    full = value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  }
+  
+  return { display, full };
+};
+
