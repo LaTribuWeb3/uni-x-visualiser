@@ -314,7 +314,7 @@ const App: React.FC = () => {
               Full Dataset (All records)
             </label>
           </div>
-          <p className="text-sm text-gray-600 mt-2 text-center">
+          <p className="text-sm text-gray-700 mt-2 text-center font-medium">
             {useFullDataset ? 
               'Warning: Full dataset may take longer to load and process.' : 
               'Using sample dataset for faster testing. Switch to full dataset for complete analysis.'
@@ -325,6 +325,50 @@ const App: React.FC = () => {
         {/* Date Range Selector */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 text-center">Date Range</h2>
+          
+          {/* Quick Selection Buttons */}
+          <div className="flex gap-3 justify-center mb-4">
+            <button
+              onClick={() => {
+                if (dataRange) {
+                  const endDate = new Date(dataRange.max);
+                  const startDate = new Date(endDate);
+                  startDate.setDate(endDate.getDate() - 30);
+                  setStartDate(format(startDate, 'yyyy-MM-dd'));
+                  setEndDate(format(endDate, 'yyyy-MM-dd'));
+                }
+              }}
+              className="px-4 py-2 bg-blue-500 text-black font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => {
+                if (dataRange) {
+                  const endDate = new Date(dataRange.max);
+                  const startDate = new Date(endDate);
+                  startDate.setDate(endDate.getDate() - 90);
+                  setStartDate(format(startDate, 'yyyy-MM-dd'));
+                  setEndDate(format(endDate, 'yyyy-MM-dd'));
+                }
+              }}
+              className="px-4 py-2 bg-green-500 text-black font-semibold rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+            >
+              Last 90 Days
+            </button>
+            <button
+              onClick={() => {
+                if (dataRange) {
+                  setStartDate(format(dataRange.min, 'yyyy-MM-dd'));
+                  setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
+                }
+              }}
+              className="px-4 py-2 bg-gray-500 text-black font-semibold rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+            >
+              All Data
+            </button>
+          </div>
+          
           <div className="flex gap-4 items-center justify-center">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -348,7 +392,7 @@ const App: React.FC = () => {
                 className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-700 font-medium">
               Data available from {dataRange ? format(dataRange.min, 'MMM dd, yyyy') : ''} to {dataRange ? format(dataRange.max, 'MMM dd, yyyy') : ''}
             </div>
           </div>
@@ -390,10 +434,10 @@ const App: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Count</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Input Volume</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rank</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Token Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Transaction Count</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Input Volume</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -402,11 +446,11 @@ const App: React.FC = () => {
                   return (
                     <tr key={token.token}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <div className="font-semibold">{getTokenName(token.token)}</div>
-                        <div className="text-xs text-gray-400 font-mono">{token.token}</div>
+                        <div className="text-xs text-gray-500 font-mono">{token.token}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{token.count}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{token.count}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span 
                           className="cursor-help" 
@@ -430,10 +474,10 @@ const App: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Pair</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Count</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Input Token Volume</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rank</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Token Pair</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Transaction Count</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Input Token Volume</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -444,11 +488,11 @@ const App: React.FC = () => {
                   return (
                     <tr key={pair.pair}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <div className="font-semibold">{inputSymbol} → {outputSymbol}</div>
-                        <div className="text-xs text-gray-400 font-mono">{pair.inputToken} → {pair.outputToken}</div>
+                        <div className="text-xs text-gray-500 font-mono">{pair.inputToken} → {pair.outputToken}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pair.count}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{pair.count}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span 
                           className="cursor-help" 
