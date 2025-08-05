@@ -109,6 +109,11 @@ const tokens = [
     name: "CRV",
     decimals: 18,
   },
+  {
+    address: "0x0F5D2fB29fb7d3CFeE444a200298f468908cC942",
+    name: "MANA",
+    decimals: 18,
+  },
   
   
 ];
