@@ -149,6 +149,46 @@ const tokens = [
     name: "DEXT",
     decimals: 18,
   },
+  {
+    address: "0xA35923162C49cF95e6BF26623385eb431ad920D3",
+    name: "TURBO",
+    decimals: 18,
+  },
+  {
+    address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
+    name: "SHIB",
+    decimals: 18,
+  },
+  {
+    address: "0x6985884C4392D348587B19cb9eAAf157F13271cd",
+    name: "ZRO",
+    decimals: 18,
+  },
+  {
+    address: "0xe53EC727dbDEB9E2d5456c3be40cFF031AB40A55",
+    name: "SUPER",
+    decimals: 18,
+  },
+  {
+    address: "0xc944E90C64B2c07662A292be6244BDf05Cda44a7",
+    name: "GRT",
+    decimals: 18,
+  },
+  {
+    address: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704",
+    name: "cbETH",
+    decimals: 18,
+  },
+  {
+    address: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c",
+    name: "SOL",
+    decimals: 9,
+  },
+  {
+    address: "0x1Bbe973BeF3a977Fc51CbED703E8ffDEfE001Fed",
+    name: "PORTAL",
+    decimals: 18,
+  },
   
   
 ];
