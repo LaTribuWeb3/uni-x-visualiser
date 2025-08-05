@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Papa from 'papaparse';
+
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
@@ -111,55 +112,50 @@ const Dashboard: React.FC = () => {
         
         const csvText = await response.text();
         
-        Papa.parse(csvText, {
+        const results = Papa.parse(csvText, {
           header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            try {
-              const transactions = results.data as Transaction[];
-              
-              if (transactions.length === 0) {
-                setError('No data found in CSV file');
-                setLoading(false);
-                return;
-              }
-              
-              // Convert timestamps to dates and find range more efficiently
-              let minTimestamp = Infinity;
-              let maxTimestamp = -Infinity;
-              
-              transactions.forEach(transaction => {
-                const timestamp = parseInt(transaction.decayStartTime);
-                if (!isNaN(timestamp)) {
-                  if (timestamp < minTimestamp) minTimestamp = timestamp;
-                  if (timestamp > maxTimestamp) maxTimestamp = timestamp;
-                }
-              });
-              
-              if (minTimestamp === Infinity || maxTimestamp === -Infinity) {
-                setError('No valid timestamps found in data');
-                setLoading(false);
-                return;
-              }
-              
-              const minDate = fromUnixTime(minTimestamp);
-              const maxDate = fromUnixTime(maxTimestamp);
-              
-              setData(transactions);
-              setDataRange({ min: minDate, max: maxDate });
-              setStartDate(format(minDate, 'yyyy-MM-dd'));
-              setEndDate(format(maxDate, 'yyyy-MM-dd'));
-              setLoading(false);
-            } catch (parseError) {
-              setError(`Error processing data: ${parseError}`);
-              setLoading(false);
-            }
-          },
-          error: (error: any) => {
-            setError(`Error parsing CSV: ${error.message}`);
-            setLoading(false);
-          }
+          skipEmptyLines: true
         });
+        
+        try {
+          const transactions = results.data as Transaction[];
+          
+          if (transactions.length === 0) {
+            setError('No data found in CSV file');
+            setLoading(false);
+            return;
+          }
+          
+          // Convert timestamps to dates and find range more efficiently
+          let minTimestamp = Infinity;
+          let maxTimestamp = -Infinity;
+          
+          transactions.forEach(transaction => {
+            const timestamp = parseInt(transaction.decayStartTime);
+            if (!isNaN(timestamp)) {
+              if (timestamp < minTimestamp) minTimestamp = timestamp;
+              if (timestamp > maxTimestamp) maxTimestamp = timestamp;
+            }
+          });
+          
+          if (minTimestamp === Infinity || maxTimestamp === -Infinity) {
+            setError('No valid timestamps found in data');
+            setLoading(false);
+            return;
+          }
+          
+          const minDate = fromUnixTime(minTimestamp);
+          const maxDate = fromUnixTime(maxTimestamp);
+          
+          setData(transactions);
+          setDataRange({ min: minDate, max: maxDate });
+          setStartDate(format(minDate, 'yyyy-MM-dd'));
+          setEndDate(format(maxDate, 'yyyy-MM-dd'));
+          setLoading(false);
+        } catch (parseError) {
+          setError(`Error processing data: ${parseError}`);
+          setLoading(false);
+        }
       } catch (err) {
         setError(`Error loading CSV file: ${err}`);
         setLoading(false);
