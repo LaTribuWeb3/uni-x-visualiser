@@ -189,6 +189,21 @@ const tokens = [
     name: "PORTAL",
     decimals: 18,
   },
+  {
+    address: "0x056Fd409E1d7A124BD7017459dFEa2F387b6d5Cd",
+    name: "GUSD",
+    decimals: 2,
+  },
+  {
+    address: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
+    name: "aEthPYUSD",
+    decimals: 6,
+  },
+  {
+    address: "0x467719aD09025FcC6cF6F8311755809d45a5E5f3",
+    name: "AXL",
+    decimals: 6,
+  },
   
   
 ];
