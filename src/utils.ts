@@ -214,6 +214,36 @@ const tokens = [
     name: "ACH",
     decimals: 8,
   },
+  {
+    address: "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+    name: "SNX",
+    decimals: 18,
+  },
+  {
+    address: "0x9BE89D2a4cd102D8Fecc6BF9dA793be995C22541",
+    name: "BBTC",
+    decimals: 8,
+  },
+  {
+    address: "0x77E06c9eCCf2E797fd462A92B6D7642EF85b0A44",
+    name: "wTAO",
+    decimals: 9,
+  },
+  {
+    address: "0x595832F8FC6BF59c85C527fEC3740A1b7a361269",
+    name: "POWR",
+    decimals: 6,
+  },
+  {
+    address: "0x6055Dc6Ff1077eebe5e6D2BA1a1f53d7Ef8430dE",
+    name: "ES",
+    decimals: 6,
+  },
+  {
+    address: "0x582d872A1B094FC48F5DE31D3B73F2D9bE47def1",
+    name: "TONCOIN",
+    decimals: 9,
+  },
   
   
 ];
