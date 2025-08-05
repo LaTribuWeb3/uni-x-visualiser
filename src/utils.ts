@@ -139,6 +139,16 @@ const tokens = [
     name: "ZRC",
     decimals: 18,
   },
+  {
+    address: "0xfF20817765cB7f73d4bde2e66e067E58D11095C2",
+    name: "AMP",
+    decimals: 18,
+  },
+  {
+    address: "0xfB7B4564402E5500dB5bB6d63Ae671302777C75a",
+    name: "DEXT",
+    decimals: 18,
+  },
   
   
 ];
