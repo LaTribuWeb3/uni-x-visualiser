@@ -31,6 +31,10 @@ const TransactionsTable: React.FC = () => {
   const [itemsPerPage] = useState(50);
   const [selectedInputToken, setSelectedInputToken] = useState<string>('all');
   const [selectedOutputToken, setSelectedOutputToken] = useState<string>('all');
+  const [inputSearchValue, setInputSearchValue] = useState<string>('');
+  const [outputSearchValue, setOutputSearchValue] = useState<string>('');
+  const [showInputSuggestions, setShowInputSuggestions] = useState<boolean>(false);
+  const [showOutputSuggestions, setShowOutputSuggestions] = useState<boolean>(false);
 
   // Load and parse CSV data
   useEffect(() => {
@@ -65,7 +69,7 @@ const TransactionsTable: React.FC = () => {
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
-          complete: (results) => {
+          complete: (results: Papa.ParseResult<Transaction>) => {
             try {
               const transactions = results.data as Transaction[];
               
@@ -136,6 +140,44 @@ const TransactionsTable: React.FC = () => {
       inputTokens: Array.from(inputTokens).sort(),
       outputTokens: Array.from(outputTokens).sort()
     };
+  };
+
+  // Get filtered suggestions for autocomplete
+  const getInputSuggestions = () => {
+    if (!inputSearchValue.trim()) return [];
+    
+    const { inputTokens } = getUniqueTokens();
+    return inputTokens
+      .filter(token => 
+        getTokenName(token).toLowerCase().includes(inputSearchValue.toLowerCase()) ||
+        token.toLowerCase().includes(inputSearchValue.toLowerCase())
+      )
+      .slice(0, 8); // Limit to 8 suggestions
+  };
+
+  const getOutputSuggestions = () => {
+    if (!outputSearchValue.trim()) return [];
+    
+    const { outputTokens } = getUniqueTokens();
+    return outputTokens
+      .filter(token => 
+        getTokenName(token).toLowerCase().includes(outputSearchValue.toLowerCase()) ||
+        token.toLowerCase().includes(outputSearchValue.toLowerCase())
+      )
+      .slice(0, 8); // Limit to 8 suggestions
+  };
+
+  // Handle token selection
+  const handleInputTokenSelect = (tokenAddress: string) => {
+    setSelectedInputToken(tokenAddress);
+    setInputSearchValue(getTokenName(tokenAddress));
+    setShowInputSuggestions(false);
+  };
+
+  const handleOutputTokenSelect = (tokenAddress: string) => {
+    setSelectedOutputToken(tokenAddress);
+    setOutputSearchValue(getTokenName(tokenAddress));
+    setShowOutputSuggestions(false);
   };
 
   // Filter data based on date range and selected tokens
@@ -352,36 +394,70 @@ const TransactionsTable: React.FC = () => {
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Tokens</label>
             <div className="flex justify-center items-center gap-2">
-              <div>
+              <div className="relative">
                 <label className="block text-xs text-gray-600 mb-1">Input Token</label>
-                <select
-                  value={selectedInputToken}
-                  onChange={(e) => setSelectedInputToken(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-                >
-                  <option value="all">All Input Tokens</option>
-                  {getUniqueTokens().inputTokens.map((token) => (
-                    <option key={token} value={token}>
-                      {getTokenName(token)}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={inputSearchValue}
+                  onChange={(e) => {
+                    setInputSearchValue(e.target.value);
+                    setShowInputSuggestions(true);
+                    if (e.target.value === '') {
+                      setSelectedInputToken('all');
+                    }
+                  }}
+                  onFocus={() => setShowInputSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowInputSuggestions(false), 200)}
+                  placeholder="Search input token..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                />
+                {showInputSuggestions && getInputSuggestions().length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {getInputSuggestions().map((token) => (
+                      <div
+                        key={token}
+                        onClick={() => handleInputTokenSelect(token)}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                      >
+                        <div className="font-medium">{getTokenName(token)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{token}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="text-gray-700 font-semibold mt-6">→</div>
-              <div>
+              <div className="relative">
                 <label className="block text-xs text-gray-600 mb-1">Output Token</label>
-                <select
-                  value={selectedOutputToken}
-                  onChange={(e) => setSelectedOutputToken(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-                >
-                  <option value="all">All Output Tokens</option>
-                  {getUniqueTokens().outputTokens.map((token) => (
-                    <option key={token} value={token}>
-                      {getTokenName(token)}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={outputSearchValue}
+                  onChange={(e) => {
+                    setOutputSearchValue(e.target.value);
+                    setShowOutputSuggestions(true);
+                    if (e.target.value === '') {
+                      setSelectedOutputToken('all');
+                    }
+                  }}
+                  onFocus={() => setShowOutputSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowOutputSuggestions(false), 200)}
+                  placeholder="Search output token..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                />
+                {showOutputSuggestions && getOutputSuggestions().length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {getOutputSuggestions().map((token) => (
+                      <div
+                        key={token}
+                        onClick={() => handleOutputTokenSelect(token)}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                      >
+                        <div className="font-medium">{getTokenName(token)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{token}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="text-center mt-2">
@@ -389,6 +465,8 @@ const TransactionsTable: React.FC = () => {
                 onClick={() => {
                   setSelectedInputToken('all');
                   setSelectedOutputToken('all');
+                  setInputSearchValue('');
+                  setOutputSearchValue('');
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
