@@ -46,8 +46,8 @@ const Navigation: React.FC = () => {
               to="/"
               className={`px-4 py-2 rounded-md font-medium transition-colors border ${
                 location.pathname === '/'
-                  ? 'bg-black text-white border-black'
-                  : 'bg-white text-black border-gray-300 hover:bg-gray-100'
+                  ? 'bg-gray-400 text-black border-gray-500'
+                  : 'bg-gray-200 text-black border-gray-400 hover:bg-gray-300'
               }`}
             >
               Dashboard
@@ -56,8 +56,8 @@ const Navigation: React.FC = () => {
               to="/transactions"
               className={`px-4 py-2 rounded-md font-medium transition-colors border ${
                 location.pathname === '/transactions'
-                  ? 'bg-black text-white border-black'
-                  : 'bg-white text-black border-gray-300 hover:bg-gray-100'
+                  ? 'bg-gray-400 text-black border-gray-500'
+                  : 'bg-gray-200 text-black border-gray-400 hover:bg-gray-300'
               }`}
             >
               Transactions Table
@@ -360,7 +360,7 @@ const Dashboard: React.FC = () => {
                   setEndDate(format(endDate, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors border border-gray-300"
+              className="px-4 py-2 bg-gray-200 text-black font-semibold rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors border border-gray-400"
             >
               Last 30 Days
             </button>
@@ -374,7 +374,7 @@ const Dashboard: React.FC = () => {
                   setEndDate(format(endDate, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors border border-gray-300"
+              className="px-4 py-2 bg-gray-200 text-black font-semibold rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors border border-gray-400"
             >
               Last 90 Days
             </button>
@@ -385,7 +385,7 @@ const Dashboard: React.FC = () => {
                   setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors border border-gray-300"
+              className="px-4 py-2 bg-gray-200 text-black font-semibold rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors border border-gray-400"
             >
               All Data
             </button>

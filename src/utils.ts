@@ -74,6 +74,16 @@ const tokens = [
     name: "ELON",
     decimals: 18,
   },
+  {
+    address: "0xB50721BCf8d664c30412Cfbc6cf7a15145234ad1",
+    name: "ARB",
+    decimals: 18,
+  },
+  {
+    address: "0x57e114B691Db790C35207b2e685D4A43181e6061",
+    name: "ENA",
+    decimals: 18,
+  },
   
   
 ];
