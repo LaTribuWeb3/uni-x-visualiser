@@ -284,6 +284,31 @@ const tokens = [
     name: "TRU",
     decimals: 8,
   },
+  {
+    address: "0x27054b13b1B798B345b591a4d22e6562d47eA75a",
+    name: "AST",
+    decimals: 4,
+  },
+  {
+    address: "0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC",
+    name: "STORJ",
+    decimals: 8,
+  },
+  {
+    address: "0x607F4C5BB672230e8672085532f7e901544a7375",
+    name: "RLC",
+    decimals: 9,
+  },
+  {
+    address: "0xd1d2Eb1B1e90B638588728b4130137D262C87cae",
+    name: "GALA",
+    decimals: 8,
+  },
+  {
+    address: "0x14feE680690900BA0ccCfC76AD70Fd1b95D10e16",
+    name: "PAAL",
+    decimals: 9,
+  },
   
 ];
 
