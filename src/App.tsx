@@ -88,8 +88,22 @@ const Dashboard: React.FC = () => {
         setError('');
         
         // Use the new order summary file
-        const filename = 'order_summary_2025-08-04T14-13-09-803Z.csv';
-        const response = await fetch(`/src/assets/${filename}`);
+        // Try to load from GitHub first, then fall back to local file
+        const githubUrl = 'https://raw.githubusercontent.com/LaTribuWeb3/uni-x-visualiser/refs/heads/main/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv?token=GHSAT0AAAAAADD6DMSCLIADOOTAVHI3Z4A62ER3TZQ';
+        const localUrl = '/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
+        
+        let response;
+        try {
+          // Try GitHub first
+          response = await fetch(githubUrl);
+          if (!response.ok) {
+            throw new Error(`GitHub fetch failed: ${response.status}`);
+          }
+        } catch (githubError) {
+          console.log('GitHub fetch failed, trying local file:', githubError);
+          // Fall back to local file
+          response = await fetch(localUrl);
+        }
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
