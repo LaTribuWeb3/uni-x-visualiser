@@ -89,6 +89,26 @@ const tokens = [
     name: "SSV",
     decimals: 18,
   },
+  {
+    address: "0x0B010000b7624eb9B3DfBC279673C76E9D29D5F7",
+    name: "OBOL",
+    decimals: 18,
+  },
+  {
+    address: "0x88909D489678dD17aA6D9609F89B0419Bf78FD9a",
+    name: "L3",
+    decimals: 18,
+  },
+  {
+    address: "0xbe0Ed4138121EcFC5c0E56B40517da27E6c5226B",
+    name: "ATH",
+    decimals: 18,
+  },
+  {
+    address: "0xD533a949740bb3306d119CC777fa900bA034cd52",
+    name: "CRV",
+    decimals: 18,
+  },
   
   
 ];
