@@ -94,7 +94,7 @@ const tokens = [
 ];
 
 export const getTokenName = (tokenAddress: string) => {
-  return tokens.find((token) => token.address === tokenAddress)?.name || "Unknown";
+  return tokens.find((token) => token.address === tokenAddress)?.name || tokenAddress;
 };
 
 export const getTokenDecimals = (tokenAddress: string) => {
