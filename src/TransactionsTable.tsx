@@ -38,7 +38,7 @@ const TransactionsTable: React.FC = () => {
         setError('');
         
         // Try to load from GitHub first, then fall back to local file
-        const githubUrl = 'https://raw.githubusercontent.com/LaTribuWeb3/uni-x-visualiser/refs/heads/main/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv?token=GHSAT0AAAAAADD6DMSCLIADOOTAVHI3Z4A62ER3TZQ';
+        const githubUrl = 'https://raw.githubusercontent.com/LaTribuWeb3/uni-x-visualiser/refs/heads/main/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
         const localUrl = '/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
         
         let response;
