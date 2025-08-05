@@ -134,6 +134,11 @@ const tokens = [
     name: "SKL",
     decimals: 18,
   },
+  {
+    address: "0xfd418e42783382E86Ae91e445406600Ba144D162",
+    name: "ZRC",
+    decimals: 18,
+  },
   
   
 ];
