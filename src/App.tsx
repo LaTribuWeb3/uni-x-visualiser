@@ -29,7 +29,7 @@ interface PairStats {
   inputToken: string;
   outputToken: string;
   count: number;
-  totalInputVolume: number;
+  totalOutputVolume: number;
 }
 
 // Navigation component
@@ -198,32 +198,32 @@ const Dashboard: React.FC = () => {
       const outputToken = transaction.outputTokenAddress;
       
       // Use correct decimal places for each token
-      const inputDecimals = getTokenDecimals(inputToken);
-      const inputVolume = parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
+      const outputDecimals = getTokenDecimals(outputToken);
+      const outputVolume = parseFloat(transaction.outputTokenAmountOverride) / Math.pow(10, outputDecimals);
 
-      // Count input tokens only
+      // Count input tokens (but don't add their volume)
       if (tokenMap.has(inputToken)) {
         const existing = tokenMap.get(inputToken)!;
         existing.count++;
-        existing.totalVolume += inputVolume;
+        // Don't add input volume to totalVolume
       } else {
         tokenMap.set(inputToken, {
           token: inputToken,
           count: 1,
-          totalVolume: inputVolume
+          totalVolume: 0 // Input tokens start with 0 volume
         });
       }
 
-      // Count output tokens (but don't add their volume)
+      // Count output tokens and add their volume
       if (tokenMap.has(outputToken)) {
         const existing = tokenMap.get(outputToken)!;
         existing.count++;
-        // Don't add output volume to totalVolume
+        existing.totalVolume += outputVolume;
       } else {
         tokenMap.set(outputToken, {
           token: outputToken,
           count: 1,
-          totalVolume: 0 // Output tokens start with 0 volume
+          totalVolume: outputVolume
         });
       }
     });
@@ -240,7 +240,7 @@ const Dashboard: React.FC = () => {
       inputToken: string; 
       outputToken: string; 
       count: number; 
-      totalInputVolume: number 
+      totalOutputVolume: number 
     }>();
 
     filteredData.forEach(transaction => {
@@ -248,21 +248,21 @@ const Dashboard: React.FC = () => {
       const outputToken = transaction.outputTokenAddress;
       const pair = `${inputToken} → ${outputToken}`;
       
-      // Use correct decimal places for input token
-      const inputDecimals = getTokenDecimals(inputToken);
-      const inputVolume = parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
+      // Use correct decimal places for output token
+      const outputDecimals = getTokenDecimals(outputToken);
+      const outputVolume = parseFloat(transaction.outputTokenAmountOverride) / Math.pow(10, outputDecimals);
 
       if (pairMap.has(pair)) {
         const existing = pairMap.get(pair)!;
         existing.count++;
-        existing.totalInputVolume += inputVolume;
+        existing.totalOutputVolume += outputVolume;
       } else {
         pairMap.set(pair, {
           pair,
           inputToken,
           outputToken,
           count: 1,
-          totalInputVolume: inputVolume
+          totalOutputVolume: outputVolume
         });
       }
     });
@@ -459,7 +459,7 @@ const Dashboard: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rank</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Token Address</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Transaction Count</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Input Volume</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Output Volume</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -499,12 +499,12 @@ const Dashboard: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rank</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Token Pair</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Transaction Count</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Input Token Volume</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Output Token Volume</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {pairStats.map((pair, index) => {
-                  const volumeInfo = formatVolume(pair.totalInputVolume);
+                  const volumeInfo = formatVolume(pair.totalOutputVolume);
                   const inputSymbol = getTokenName(pair.inputToken);
                   const outputSymbol = getTokenName(pair.outputToken);
                   return (
@@ -520,7 +520,7 @@ const Dashboard: React.FC = () => {
                           className="cursor-help" 
                           title={volumeInfo.full}
                         >
-                          {volumeInfo.display} {inputSymbol}
+                          {volumeInfo.display} {outputSymbol}
                         </span>
                       </td>
                     </tr>

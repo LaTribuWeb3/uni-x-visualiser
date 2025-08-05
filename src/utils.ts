@@ -84,6 +84,11 @@ const tokens = [
     name: "ENA",
     decimals: 18,
   },
+  {
+    address: "0x9D65fF81a3c488d585bBfb0Bfe3c7707c7917f54",
+    name: "SSV",
+    decimals: 18,
+  },
   
   
 ];
