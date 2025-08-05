@@ -119,6 +119,11 @@ const tokens = [
     name: "JASMY",
     decimals: 18,
   },
+  {
+    address: "0x643C4E15d7d62Ad0aBeC4a9BD4b001aA3Ef52d66",
+    name: "SYRUP",
+    decimals: 18,
+  },
   
   
 ];
