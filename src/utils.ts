@@ -204,6 +204,16 @@ const tokens = [
     name: "AXL",
     decimals: 6,
   },
+  {
+    address: "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+    name: "COMP",
+    decimals: 18,
+  },
+  {
+    address: "0xEd04915c23f00A313a544955524EB7DBD823143d",
+    name: "ACH",
+    decimals: 8,
+  },
   
   
 ];
