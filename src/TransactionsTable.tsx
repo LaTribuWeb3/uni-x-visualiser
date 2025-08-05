@@ -29,6 +29,7 @@ const TransactionsTable: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'decayStartTime', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
+  const [selectedPair, setSelectedPair] = useState<string>('all');
 
   // Load and parse CSV data
   useEffect(() => {
@@ -118,24 +119,61 @@ const TransactionsTable: React.FC = () => {
     loadData();
   }, []);
 
-  // Filter data based on date range
+
+
+  // Get unique pairs for filtering
+  const getUniquePairs = () => {
+    const pairs = new Set<string>();
+    data.forEach(transaction => {
+      const inputSymbol = getTokenName(transaction.inputTokenAddress);
+      const outputSymbol = getTokenName(transaction.outputTokenAddress);
+      const pair = `${inputSymbol} → ${outputSymbol}`;
+      pairs.add(pair);
+    });
+    return Array.from(pairs).sort();
+  };
+
+  // Filter data based on date range and selected pair
   useEffect(() => {
     if (!data.length || !startDate || !endDate) {
-      setFilteredData(data);
+      let filtered = data;
+      
+      // Apply pair filter if not "all"
+      if (selectedPair !== 'all') {
+        filtered = data.filter(transaction => {
+          const inputSymbol = getTokenName(transaction.inputTokenAddress);
+          const outputSymbol = getTokenName(transaction.outputTokenAddress);
+          const pair = `${inputSymbol} → ${outputSymbol}`;
+          return pair === selectedPair;
+        });
+      }
+      
+      setFilteredData(filtered);
+      setCurrentPage(1);
       return;
     }
 
     const start = startOfDay(new Date(startDate));
     const end = endOfDay(new Date(endDate));
 
-    const filtered = data.filter(transaction => {
+    let filtered = data.filter(transaction => {
       const transactionDate = fromUnixTime(parseInt(transaction.decayStartTime));
       return isWithinInterval(transactionDate, { start, end });
     });
 
+    // Apply pair filter if not "all"
+    if (selectedPair !== 'all') {
+      filtered = filtered.filter(transaction => {
+        const inputSymbol = getTokenName(transaction.inputTokenAddress);
+        const outputSymbol = getTokenName(transaction.outputTokenAddress);
+        const pair = `${inputSymbol} → ${outputSymbol}`;
+        return pair === selectedPair;
+      });
+    }
+
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [data, startDate, endDate]);
+  }, [data, startDate, endDate, selectedPair]);
 
   // Sorting function
   const sortData = (data: Transaction[]) => {
@@ -180,6 +218,16 @@ const TransactionsTable: React.FC = () => {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
+  };
+
+  // Copy to clipboard function
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here if desired
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
   };
 
   const sortedData = sortData(filteredData);
@@ -284,6 +332,25 @@ const TransactionsTable: React.FC = () => {
               Showing {filteredData.length.toLocaleString()} of {data.length.toLocaleString()} transactions
             </div>
           </div>
+          
+          {/* Pair Filter */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Token Pair</label>
+            <div className="flex justify-center">
+              <select
+                value={selectedPair}
+                onChange={(e) => setSelectedPair(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              >
+                <option value="all">All Pairs</option>
+                {getUniquePairs().map((pair) => (
+                  <option key={pair} value={pair}>
+                    {pair}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Transactions Table */}
@@ -385,10 +452,22 @@ const TransactionsTable: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {transaction.orderHash.substring(0, 10)}...
+                        <button
+                          onClick={() => copyToClipboard(transaction.orderHash)}
+                          className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                          title="Click to copy full order hash"
+                        >
+                          {transaction.orderHash.substring(0, 10)}...
+                        </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {transaction.transactionHash.substring(0, 10)}...
+                        <button
+                          onClick={() => copyToClipboard(transaction.transactionHash)}
+                          className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                          title="Click to copy full transaction hash"
+                        >
+                          {transaction.transactionHash.substring(0, 10)}...
+                        </button>
                       </td>
                     </tr>
                   );
