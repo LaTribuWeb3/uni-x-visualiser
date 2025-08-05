@@ -244,7 +244,21 @@ const tokens = [
     name: "TONCOIN",
     decimals: 9,
   },
-  
+  {
+    address: "0xA2cd3D43c775978A96BdBf12d733D5A1ED94fb18",
+    name: "XCN",
+    decimals: 18,
+  },
+  {
+    address: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+    name: "AAVE",
+    decimals: 18,
+  },
+  {
+    address: "0x44108f0223A3C3028F5Fe7AEC7f9bb2E66beF82F",
+    name: "ACX",
+    decimals: 18,
+  },
   
 ];
 
