@@ -259,6 +259,31 @@ const tokens = [
     name: "ACX",
     decimals: 18,
   },
+  {
+    address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
+    name: "EURC",
+    decimals: 6,
+  },
+  {
+    address: "0x3073f7aAA4DB83f95e9FFf17424F71D4751a3073",
+    name: "MOVE",
+    decimals: 8,
+  },
+  {
+    address: "0xA0b73E1Ff0B80914AB6fe0444E65848C4C34450b",
+    name: "CRO",
+    decimals: 8,
+  },
+  {
+    address: "0x226bb599a12C826476e3A771454697EA52E9E220",
+    name: "PRO",
+    decimals: 8,
+  },
+  {
+    address: "0x4C19596f5aAfF459fA38B0f7eD92F11AE6543784",
+    name: "TRU",
+    decimals: 8,
+  },
   
 ];
 
