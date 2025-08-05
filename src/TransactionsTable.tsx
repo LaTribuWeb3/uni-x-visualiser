@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Papa from 'papaparse';
+import Papa, { ParseResult } from 'papaparse';
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 
@@ -69,7 +69,7 @@ const TransactionsTable: React.FC = () => {
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
-          complete: (results: Papa.ParseResult<Transaction>) => {
+          complete: (results: ParseResult<Transaction>) => {
             try {
               const transactions = results.data as Transaction[];
               
@@ -110,7 +110,7 @@ const TransactionsTable: React.FC = () => {
               setLoading(false);
             }
           },
-          error: (error: Papa.ParseError) => {
+          error: (error: any) => {
             setError(`Error parsing CSV: ${error.message}`);
             setLoading(false);
           }
