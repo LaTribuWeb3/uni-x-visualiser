@@ -124,6 +124,11 @@ const tokens = [
     name: "SYRUP",
     decimals: 18,
   },
+  {
+    address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+    name: "cbBTC",
+    decimals: 8,
+  },
   
   
 ];
