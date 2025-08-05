@@ -29,7 +29,8 @@ const TransactionsTable: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'decayStartTime', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
-  const [selectedPair, setSelectedPair] = useState<string>('all');
+  const [selectedInputToken, setSelectedInputToken] = useState<string>('all');
+  const [selectedOutputToken, setSelectedOutputToken] = useState<string>('all');
 
   // Load and parse CSV data
   useEffect(() => {
@@ -105,7 +106,7 @@ const TransactionsTable: React.FC = () => {
               setLoading(false);
             }
           },
-          error: (error: any) => {
+          error: (error: Papa.ParseError) => {
             setError(`Error parsing CSV: ${error.message}`);
             setLoading(false);
           }
@@ -121,31 +122,39 @@ const TransactionsTable: React.FC = () => {
 
 
 
-  // Get unique pairs for filtering
-  const getUniquePairs = () => {
-    const pairs = new Set<string>();
+  // Get unique tokens for filtering
+  const getUniqueTokens = () => {
+    const inputTokens = new Set<string>();
+    const outputTokens = new Set<string>();
+    
     data.forEach(transaction => {
-      const inputSymbol = getTokenName(transaction.inputTokenAddress);
-      const outputSymbol = getTokenName(transaction.outputTokenAddress);
-      const pair = `${inputSymbol} → ${outputSymbol}`;
-      pairs.add(pair);
+      inputTokens.add(transaction.inputTokenAddress);
+      outputTokens.add(transaction.outputTokenAddress);
     });
-    return Array.from(pairs).sort();
+    
+    return {
+      inputTokens: Array.from(inputTokens).sort(),
+      outputTokens: Array.from(outputTokens).sort()
+    };
   };
 
-  // Filter data based on date range and selected pair
+  // Filter data based on date range and selected tokens
   useEffect(() => {
     if (!data.length || !startDate || !endDate) {
       let filtered = data;
       
-      // Apply pair filter if not "all"
-      if (selectedPair !== 'all') {
-        filtered = data.filter(transaction => {
-          const inputSymbol = getTokenName(transaction.inputTokenAddress);
-          const outputSymbol = getTokenName(transaction.outputTokenAddress);
-          const pair = `${inputSymbol} → ${outputSymbol}`;
-          return pair === selectedPair;
-        });
+      // Apply input token filter if not "all"
+      if (selectedInputToken !== 'all') {
+        filtered = filtered.filter(transaction => 
+          transaction.inputTokenAddress === selectedInputToken
+        );
+      }
+      
+      // Apply output token filter if not "all"
+      if (selectedOutputToken !== 'all') {
+        filtered = filtered.filter(transaction => 
+          transaction.outputTokenAddress === selectedOutputToken
+        );
       }
       
       setFilteredData(filtered);
@@ -161,43 +170,49 @@ const TransactionsTable: React.FC = () => {
       return isWithinInterval(transactionDate, { start, end });
     });
 
-    // Apply pair filter if not "all"
-    if (selectedPair !== 'all') {
-      filtered = filtered.filter(transaction => {
-        const inputSymbol = getTokenName(transaction.inputTokenAddress);
-        const outputSymbol = getTokenName(transaction.outputTokenAddress);
-        const pair = `${inputSymbol} → ${outputSymbol}`;
-        return pair === selectedPair;
-      });
+    // Apply input token filter if not "all"
+    if (selectedInputToken !== 'all') {
+      filtered = filtered.filter(transaction => 
+        transaction.inputTokenAddress === selectedInputToken
+      );
+    }
+    
+    // Apply output token filter if not "all"
+    if (selectedOutputToken !== 'all') {
+      filtered = filtered.filter(transaction => 
+        transaction.outputTokenAddress === selectedOutputToken
+      );
     }
 
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [data, startDate, endDate, selectedPair]);
+  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken]);
 
   // Sorting function
   const sortData = (data: Transaction[]) => {
     return [...data].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (sortConfig.key) {
         case 'formattedDate':
           aValue = fromUnixTime(parseInt(a.decayStartTime));
           bValue = fromUnixTime(parseInt(b.decayStartTime));
           break;
-        case 'inputVolume':
+        case 'inputVolume': {
           const inputDecimalsA = getTokenDecimals(a.inputTokenAddress);
           const inputDecimalsB = getTokenDecimals(b.inputTokenAddress);
           aValue = parseFloat(a.inputStartAmount) / Math.pow(10, inputDecimalsA);
           bValue = parseFloat(b.inputStartAmount) / Math.pow(10, inputDecimalsB);
           break;
-        case 'outputVolume':
+        }
+        case 'outputVolume': {
           const outputDecimalsA = getTokenDecimals(a.outputTokenAddress);
           const outputDecimalsB = getTokenDecimals(b.outputTokenAddress);
           aValue = parseFloat(a.outputTokenAmountOverride) / Math.pow(10, outputDecimalsA);
           bValue = parseFloat(b.outputTokenAmountOverride) / Math.pow(10, outputDecimalsB);
           break;
+        }
         default:
           aValue = a[sortConfig.key];
           bValue = b[sortConfig.key];
@@ -333,22 +348,52 @@ const TransactionsTable: React.FC = () => {
             </div>
           </div>
           
-          {/* Pair Filter */}
+          {/* Token Filters */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Token Pair</label>
-            <div className="flex justify-center">
-              <select
-                value={selectedPair}
-                onChange={(e) => setSelectedPair(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Tokens</label>
+            <div className="flex justify-center items-center gap-2">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Input Token</label>
+                <select
+                  value={selectedInputToken}
+                  onChange={(e) => setSelectedInputToken(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+                >
+                  <option value="all">All Input Tokens</option>
+                  {getUniqueTokens().inputTokens.map((token) => (
+                    <option key={token} value={token}>
+                      {getTokenName(token)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="text-gray-700 font-semibold mt-6">→</div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Output Token</label>
+                <select
+                  value={selectedOutputToken}
+                  onChange={(e) => setSelectedOutputToken(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+                >
+                  <option value="all">All Output Tokens</option>
+                  {getUniqueTokens().outputTokens.map((token) => (
+                    <option key={token} value={token}>
+                      {getTokenName(token)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="text-center mt-2">
+              <button
+                onClick={() => {
+                  setSelectedInputToken('all');
+                  setSelectedOutputToken('all');
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
-                <option value="all">All Pairs</option>
-                {getUniquePairs().map((pair) => (
-                  <option key={pair} value={pair}>
-                    {pair}
-                  </option>
-                ))}
-              </select>
+                Clear Filters
+              </button>
             </div>
           </div>
         </div>
