@@ -129,6 +129,11 @@ const tokens = [
     name: "cbBTC",
     decimals: 8,
   },
+  {
+    address: "0x00c83aeCC790e8a4453e5dD3B0B4b3680501a7A7",
+    name: "SKL",
+    decimals: 18,
+  },
   
   
 ];
