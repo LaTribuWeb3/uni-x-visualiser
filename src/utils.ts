@@ -64,6 +64,18 @@ const tokens = [
     name: "SPX",
     decimals: 8,
   },
+  {
+    address: "0xaaeE1A9723aaDB7afA2810263653A34bA2C21C7a",
+    name: "MOG",
+    decimals: 18,
+  },
+  {
+    address: "0x761D38e5ddf6ccf6Cf7c55759d5210750B5D60F3",
+    name: "ELON",
+    decimals: 18,
+  },
+  
+  
 ];
 
 export const getTokenName = (tokenAddress: string) => {

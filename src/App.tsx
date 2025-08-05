@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Papa from 'papaparse';
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
+import TransactionsTable from './TransactionsTable';
 import './App.css';
 
 interface Transaction {
-  createdAt: string;
-  inputToken: string;
+  decayStartTime: string;
+  inputTokenAddress: string;
   inputStartAmount: string;
-  inputEndAmount: string;
-  outputToken: string;
-  outputStartAmount: string;
-  outputEndAmount: string;
-  swapper: string;
+  outputTokenAddress: string;
+  outputTokenAmountOverride: string;
+  orderHash: string;
+  transactionHash: string;
 }
 
 
@@ -31,7 +32,45 @@ interface PairStats {
   totalInputVolume: number;
 }
 
-const App: React.FC = () => {
+// Navigation component
+const Navigation: React.FC = () => {
+  const location = useLocation();
+  
+  return (
+    <nav className="bg-white shadow-md mb-6">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex justify-between items-center py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Uni-X Visualizer</h1>
+          <div className="flex space-x-4">
+            <Link
+              to="/"
+              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
+                location.pathname === '/'
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-black border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/transactions"
+              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
+                location.pathname === '/transactions'
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-black border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Transactions Table
+            </Link>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+// Dashboard component (existing App logic)
+const Dashboard: React.FC = () => {
   const [data, setData] = useState<Transaction[]>([]);
   const [filteredData, setFilteredData] = useState<Transaction[]>([]);
   const [startDate, setStartDate] = useState<string>('');
@@ -39,7 +78,7 @@ const App: React.FC = () => {
   const [dataRange, setDataRange] = useState<{ min: Date; max: Date } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [useFullDataset, setUseFullDataset] = useState(false);
+
 
   // Load and parse CSV data
   useEffect(() => {
@@ -48,8 +87,8 @@ const App: React.FC = () => {
         setLoading(true);
         setError('');
         
-        // Use sample data by default, full dataset as option
-        const filename = useFullDataset ? 'simplified_orders.csv' : 'sample_orders.csv';
+        // Use the new order summary file
+        const filename = 'order_summary_2025-08-04T14-13-09-803Z.csv';
         const response = await fetch(`/src/assets/${filename}`);
         
         if (!response.ok) {
@@ -76,7 +115,7 @@ const App: React.FC = () => {
               let maxTimestamp = -Infinity;
               
               transactions.forEach(transaction => {
-                const timestamp = parseInt(transaction.createdAt);
+                const timestamp = parseInt(transaction.decayStartTime);
                 if (!isNaN(timestamp)) {
                   if (timestamp < minTimestamp) minTimestamp = timestamp;
                   if (timestamp > maxTimestamp) maxTimestamp = timestamp;
@@ -114,7 +153,7 @@ const App: React.FC = () => {
     };
 
     loadData();
-  }, [useFullDataset]);
+  }, []);
 
   // Filter data based on date range
   useEffect(() => {
@@ -127,7 +166,7 @@ const App: React.FC = () => {
     const end = endOfDay(new Date(endDate));
 
     const filtered = data.filter(transaction => {
-      const transactionDate = fromUnixTime(parseInt(transaction.createdAt));
+      const transactionDate = fromUnixTime(parseInt(transaction.decayStartTime));
       return isWithinInterval(transactionDate, { start, end });
     });
 
@@ -141,8 +180,8 @@ const App: React.FC = () => {
     const tokenMap = new Map<string, { token: string; count: number; totalVolume: number }>();
 
     filteredData.forEach(transaction => {
-      const inputToken = transaction.inputToken;
-      const outputToken = transaction.outputToken;
+      const inputToken = transaction.inputTokenAddress;
+      const outputToken = transaction.outputTokenAddress;
       
       // Use correct decimal places for each token
       const inputDecimals = getTokenDecimals(inputToken);
@@ -191,8 +230,8 @@ const App: React.FC = () => {
     }>();
 
     filteredData.forEach(transaction => {
-      const inputToken = transaction.inputToken;
-      const outputToken = transaction.outputToken;
+      const inputToken = transaction.inputTokenAddress;
+      const outputToken = transaction.outputTokenAddress;
       const pair = `${inputToken} → ${outputToken}`;
       
       // Use correct decimal places for input token
@@ -222,27 +261,27 @@ const App: React.FC = () => {
   // Get summary statistics
   const getSummaryStats = () => {
     const totalTransactions = filteredData.length;
-    const uniqueSwappers = new Set(filteredData.map(t => t.swapper)).size;
+    const uniqueTransactions = new Set(filteredData.map(t => t.transactionHash)).size;
     
     // Count input tokens
     const inputTokenCounts = new Map<string, number>();
     filteredData.forEach(transaction => {
-      const inputToken = transaction.inputToken;
+      const inputToken = transaction.inputTokenAddress;
       inputTokenCounts.set(inputToken, (inputTokenCounts.get(inputToken) || 0) + 1);
     });
     
     // Count output tokens
     const outputTokenCounts = new Map<string, number>();
     filteredData.forEach(transaction => {
-      const outputToken = transaction.outputToken;
+      const outputToken = transaction.outputTokenAddress;
       outputTokenCounts.set(outputToken, (outputTokenCounts.get(outputToken) || 0) + 1);
     });
     
     // Count token pairs
     const pairCounts = new Map<string, number>();
     filteredData.forEach(transaction => {
-      const inputSymbol = getTokenName(transaction.inputToken);
-      const outputSymbol = getTokenName(transaction.outputToken);
+      const inputSymbol = getTokenName(transaction.inputTokenAddress);
+      const outputSymbol = getTokenName(transaction.outputTokenAddress);
       const pair = `${inputSymbol} → ${outputSymbol}`;
       pairCounts.set(pair, (pairCounts.get(pair) || 0) + 1);
     });
@@ -259,7 +298,7 @@ const App: React.FC = () => {
 
     return {
       totalTransactions,
-      uniqueSwappers,
+      uniqueTransactions,
       mostSeenInputToken: { token: mostSeenInputToken[0], count: mostSeenInputToken[1] },
       mostSeenOutputToken: { token: mostSeenOutputToken[0], count: mostSeenOutputToken[1] },
       mostSeenPair: { pair: mostSeenPair[0], count: mostSeenPair[1] }
@@ -289,38 +328,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">Uni-X Transaction Visualizer</h1>
-        
-        {/* Dataset Selector */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-center">Dataset Selection</h2>
-          <div className="flex gap-4 items-center justify-center">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={!useFullDataset}
-                onChange={() => setUseFullDataset(false)}
-                className="mr-2"
-              />
-              Sample Dataset (1,000 records)
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                checked={useFullDataset}
-                onChange={() => setUseFullDataset(true)}
-                className="mr-2"
-              />
-              Full Dataset (All records)
-            </label>
-          </div>
-          <p className="text-sm text-gray-700 mt-2 text-center font-medium">
-            {useFullDataset ? 
-              'Warning: Full dataset may take longer to load and process.' : 
-              'Using sample dataset for faster testing. Switch to full dataset for complete analysis.'
-            }
-          </p>
-        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Dashboard Overview</h2>
         
         {/* Date Range Selector */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -338,7 +346,7 @@ const App: React.FC = () => {
                   setEndDate(format(endDate, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-blue-500 text-black font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors border border-gray-300"
             >
               Last 30 Days
             </button>
@@ -352,7 +360,7 @@ const App: React.FC = () => {
                   setEndDate(format(endDate, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-green-500 text-black font-semibold rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors border border-gray-300"
             >
               Last 90 Days
             </button>
@@ -363,7 +371,7 @@ const App: React.FC = () => {
                   setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
                 }
               }}
-              className="px-4 py-2 bg-gray-500 text-black font-semibold rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+              className="px-4 py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors border border-gray-300"
             >
               All Data
             </button>
@@ -405,8 +413,8 @@ const App: React.FC = () => {
             <p className="text-3xl font-bold text-blue-600">{summaryStats.totalTransactions.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Swappers</h3>
-            <p className="text-3xl font-bold text-green-600">{summaryStats.uniqueSwappers.toLocaleString()}</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Transactions</h3>
+            <p className="text-3xl font-bold text-green-600">{summaryStats.uniqueTransactions.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Most Seen Input Token</h3>
@@ -510,6 +518,18 @@ const App: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Navigation />
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/transactions" element={<TransactionsTable />} />
+      </Routes>
+    </Router>
   );
 };
 
