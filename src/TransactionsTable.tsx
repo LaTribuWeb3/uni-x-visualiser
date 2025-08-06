@@ -680,13 +680,15 @@ const TransactionsTable: React.FC = () => {
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        <button
-                          onClick={() => copyToClipboard(transaction.transactionHash)}
+                        <a
+                          href={`https://etherscan.io/tx/${transaction.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                          title="Click to copy full transaction hash"
+                          title="Click to view on Etherscan"
                         >
                           {transaction.transactionHash.substring(0, 10)}...
-                        </button>
+                        </a>
                       </td>
                     </tr>
                   );
