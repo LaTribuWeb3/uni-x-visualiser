@@ -1376,3 +1376,10 @@ export const formatVolume = (value: number): { display: string; full: string } =
   return { display, full };
 };
 
+export const truncateAddress = (address: string, startLength: number = 6, endLength: number = 4): string => {
+  if (!address || address.length <= startLength + endLength + 3) {
+    return address;
+  }
+  return `${address.substring(0, startLength)}...${address.substring(address.length - endLength)}`;
+};
+

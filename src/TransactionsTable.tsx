@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
-import { getTokenName, getTokenDecimals, formatVolume } from './utils';
+import { getTokenName, getTokenDecimals, formatVolume, truncateAddress } from './utils';
 
 interface Transaction {
   decayStartTime: string;
@@ -548,7 +548,15 @@ const TransactionsTable: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <div className="font-semibold">{getTokenName(transaction.inputTokenAddress)}</div>
-                        <div className="text-xs text-gray-500 font-mono">{transaction.inputTokenAddress}</div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          <button
+                            onClick={() => copyToClipboard(transaction.inputTokenAddress)}
+                            className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                            title="Click to copy full address"
+                          >
+                            {truncateAddress(transaction.inputTokenAddress)}
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <span 
@@ -560,7 +568,15 @@ const TransactionsTable: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <div className="font-semibold">{getTokenName(transaction.outputTokenAddress)}</div>
-                        <div className="text-xs text-gray-500 font-mono">{transaction.outputTokenAddress}</div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          <button
+                            onClick={() => copyToClipboard(transaction.outputTokenAddress)}
+                            className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                            title="Click to copy full address"
+                          >
+                            {truncateAddress(transaction.outputTokenAddress)}
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <span 
