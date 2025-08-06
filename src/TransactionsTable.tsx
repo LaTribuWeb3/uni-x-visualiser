@@ -283,6 +283,25 @@ const TransactionsTable: React.FC = () => {
     }
   };
 
+  // Calculate total input volume for filtered transactions
+  const getTotalInputVolume = () => {
+    if (selectedInputToken === 'all') return null;
+    
+    const totalVolume = filteredData.reduce((total, transaction) => {
+      const inputDecimals = getTokenDecimals(transaction.inputTokenAddress);
+      const volume = parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
+      return total + volume;
+    }, 0);
+    
+    const volumeInfo = formatVolume(totalVolume);
+    return {
+      volume: totalVolume,
+      display: volumeInfo.display,
+      full: volumeInfo.full,
+      tokenName: getTokenName(selectedInputToken)
+    };
+  };
+
   const sortedData = sortData(filteredData);
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const paginatedData = sortedData.slice(
@@ -383,6 +402,20 @@ const TransactionsTable: React.FC = () => {
             </div>
             <div className="text-sm text-gray-700 font-medium">
               Showing {filteredData.length.toLocaleString()} of {data.length.toLocaleString()} transactions
+              {(() => {
+                const totalVolume = getTotalInputVolume();
+                if (totalVolume) {
+                  return (
+                    <div className="mt-1 text-blue-600 font-semibold">
+                      Total {totalVolume.tokenName}: {totalVolume.display}
+                      <span className="text-xs text-gray-500 ml-1" title={totalVolume.full}>
+                        (hover for exact value)
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
           
