@@ -287,18 +287,36 @@ const TransactionsTable: React.FC = () => {
   const getTotalInputVolume = () => {
     if (selectedInputToken === 'all') return null;
     
-    const totalVolume = filteredData.reduce((total, transaction) => {
+    const volumes = filteredData.map(transaction => {
       const inputDecimals = getTokenDecimals(transaction.inputTokenAddress);
-      const volume = parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
-      return total + volume;
-    }, 0);
+      return parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
+    });
     
-    const volumeInfo = formatVolume(totalVolume);
+    const totalVolume = volumes.reduce((total, volume) => total + volume, 0);
+    const meanVolume = totalVolume / volumes.length;
+    
+    // Calculate median
+    const sortedVolumes = [...volumes].sort((a, b) => a - b);
+    const medianVolume = sortedVolumes.length % 2 === 0
+      ? (sortedVolumes[sortedVolumes.length / 2 - 1] + sortedVolumes[sortedVolumes.length / 2]) / 2
+      : sortedVolumes[Math.floor(sortedVolumes.length / 2)];
+    
+    const totalVolumeInfo = formatVolume(totalVolume);
+    const meanVolumeInfo = formatVolume(meanVolume);
+    const medianVolumeInfo = formatVolume(medianVolume);
+    
     return {
       volume: totalVolume,
-      display: volumeInfo.display,
-      full: volumeInfo.full,
-      tokenName: getTokenName(selectedInputToken)
+      display: totalVolumeInfo.display,
+      full: totalVolumeInfo.full,
+      mean: meanVolume,
+      meanDisplay: meanVolumeInfo.display,
+      meanFull: meanVolumeInfo.full,
+      median: medianVolume,
+      medianDisplay: medianVolumeInfo.display,
+      medianFull: medianVolumeInfo.full,
+      tokenName: getTokenName(selectedInputToken),
+      count: volumes.length
     };
   };
 
@@ -407,10 +425,23 @@ const TransactionsTable: React.FC = () => {
                 if (totalVolume) {
                   return (
                     <div className="mt-1 text-blue-600 font-semibold">
-                      Total {totalVolume.tokenName}: {totalVolume.display}
-                      <span className="text-xs text-gray-500 ml-1" title={totalVolume.full}>
-                        (hover for exact value)
-                      </span>
+                      <div>
+                        Total {totalVolume.tokenName}: {totalVolume.display}
+                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.full}>
+                          (hover for exact value)
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Mean: {totalVolume.meanDisplay}
+                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.meanFull}>
+                          (hover for exact value)
+                        </span>
+                        {' • '}
+                        Median: {totalVolume.medianDisplay}
+                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.medianFull}>
+                          (hover for exact value)
+                        </span>
+                      </div>
                     </div>
                   );
                 }
