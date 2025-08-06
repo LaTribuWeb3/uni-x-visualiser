@@ -141,6 +141,23 @@ class ApiService {
     return this.fetchWithErrorHandling(url);
   }
 
+  async getTokenPairs(filters?: { startDate?: string; endDate?: string }): Promise<{
+    pairs: Array<{
+      pair: string;
+      inputToken: string;
+      outputToken: string;
+      count: number;
+      totalOutputVolume: number;
+    }>;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+    
+    const url = `${API_BASE_URL}/transactions/pairs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.fetchWithErrorHandling(url);
+  }
+
   async getTransactions(filters: TransactionFilters = {}): Promise<PaginatedTransactions> {
     const queryParams = new URLSearchParams();
     

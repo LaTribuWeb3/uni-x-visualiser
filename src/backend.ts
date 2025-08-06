@@ -500,6 +500,62 @@ app.get('/api/transactions/display', async (req, res) => {
   }
 });
 
+// Get token pair statistics
+app.get('/api/transactions/pairs', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const { startDate, endDate } = req.query;
+    
+    // Build date filter
+    const dateFilter: Record<string, any> = {};
+    if (startDate || endDate) {
+      dateFilter.decayStartTimeTimestamp = {};
+      if (startDate) {
+        dateFilter.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+      }
+      if (endDate) {
+        dateFilter.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+      }
+    }
+
+    console.log('🔗 Computing token pair statistics...');
+
+    // Get top token pairs by transaction count
+    const topPairs = await transactionsCollection.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: {
+            inputToken: '$inputTokenAddress',
+            outputToken: '$outputTokenAddress'
+          },
+          count: { $sum: 1 },
+          totalOutputVolume: { $sum: { $toDouble: '$outputTokenAmountOverride' } }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]).toArray();
+
+    const pairs = topPairs.map(pair => ({
+      pair: `${pair._id.inputToken} → ${pair._id.outputToken}`,
+      inputToken: pair._id.inputToken,
+      outputToken: pair._id.outputToken,
+      count: pair.count,
+      totalOutputVolume: pair.totalOutputVolume
+    }));
+
+    console.log(`✅ Pairs: Found ${pairs.length} top token pairs`);
+    res.json({ pairs });
+  } catch (error) {
+    console.error('Error computing pair statistics:', error);
+    res.status(500).json({ error: 'Failed to compute pair statistics' });
+  }
+});
+
 // 404 handler - must be last
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });

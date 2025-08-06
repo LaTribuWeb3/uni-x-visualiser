@@ -86,6 +86,13 @@ const Dashboard: React.FC = () => {
     topInputTokens: Array<{ _id: string; count: number }>;
     topOutputTokens: Array<{ _id: string; count: number; totalVolume: number }>;
   } | null>(null);
+  const [tokenPairs, setTokenPairs] = useState<Array<{
+    pair: string;
+    inputToken: string;
+    outputToken: string;
+    count: number;
+    totalOutputVolume: number;
+  }>>([]);
 
   // Load metadata and statistics efficiently
   useEffect(() => {
@@ -119,6 +126,10 @@ const Dashboard: React.FC = () => {
         // Load initial statistics
         const statsResult = await apiService.getStatistics();
         setStatistics(statsResult);
+        
+        // Load token pair statistics
+        const pairsResult = await apiService.getTokenPairs();
+        setTokenPairs(pairsResult.pairs);
         
         setLoading(false);
         
@@ -171,87 +182,28 @@ const Dashboard: React.FC = () => {
 
 
 
-  // Calculate token popularity
+  // Calculate token popularity using backend statistics
   const getTokenStats = (): TokenStats[] => {
-    const tokenMap = new Map<string, { token: string; count: number; totalVolume: number }>();
-
-    filteredData.forEach(transaction => {
-      const inputToken = transaction.inputTokenAddress;
-      const outputToken = transaction.outputTokenAddress;
-      
-      // Use correct decimal places for each token
-      const outputDecimals = getTokenDecimals(outputToken);
-      const outputVolume = parseFloat(transaction.outputTokenAmountOverride) / Math.pow(10, outputDecimals);
-
-      // Count input tokens (but don't add their volume)
-      if (tokenMap.has(inputToken)) {
-        const existing = tokenMap.get(inputToken)!;
-        existing.count++;
-        // Don't add input volume to totalVolume
-      } else {
-        tokenMap.set(inputToken, {
-          token: inputToken,
-          count: 1,
-          totalVolume: 0 // Input tokens start with 0 volume
-        });
-      }
-
-      // Count output tokens and add their volume
-      if (tokenMap.has(outputToken)) {
-        const existing = tokenMap.get(outputToken)!;
-        existing.count++;
-        existing.totalVolume += outputVolume;
-      } else {
-        tokenMap.set(outputToken, {
-          token: outputToken,
-          count: 1,
-          totalVolume: outputVolume
-        });
-      }
-    });
-
-    return Array.from(tokenMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 tokens
+    if (!statistics?.topOutputTokens) return [];
+    
+    return statistics.topOutputTokens.map((token, index) => ({
+      token: token._id,
+      count: token.count,
+      totalVolume: token.totalVolume
+    }));
   };
 
-  // Calculate pair popularity
+  // Calculate pair popularity using backend statistics
   const getPairStats = (): PairStats[] => {
-    const pairMap = new Map<string, { 
-      pair: string; 
-      inputToken: string; 
-      outputToken: string; 
-      count: number; 
-      totalOutputVolume: number 
-    }>();
-
-    filteredData.forEach(transaction => {
-      const inputToken = transaction.inputTokenAddress;
-      const outputToken = transaction.outputTokenAddress;
-      const pair = `${inputToken} → ${outputToken}`;
-      
-      // Use correct decimal places for output token
-      const outputDecimals = getTokenDecimals(outputToken);
-      const outputVolume = parseFloat(transaction.outputTokenAmountOverride) / Math.pow(10, outputDecimals);
-
-      if (pairMap.has(pair)) {
-        const existing = pairMap.get(pair)!;
-        existing.count++;
-        existing.totalOutputVolume += outputVolume;
-      } else {
-        pairMap.set(pair, {
-          pair,
-          inputToken,
-          outputToken,
-          count: 1,
-          totalOutputVolume: outputVolume
-        });
-      }
-    });
-
-    return Array.from(pairMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 pairs
+    if (!tokenPairs.length) return [];
+    
+    return tokenPairs.map(pair => ({
+      pair: pair.pair,
+      inputToken: pair.inputToken,
+      outputToken: pair.outputToken,
+      count: pair.count,
+      totalOutputVolume: pair.totalOutputVolume
+    }));
   };
 
   // Calculate summary stats using efficient backend statistics
