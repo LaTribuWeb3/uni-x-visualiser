@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Papa from 'papaparse';
 
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
+import apiService from './services/api';
+import { Transaction } from './types/Transaction';
 import './App.css';
-
-interface Transaction {
-  decayStartTime: string;
-  inputTokenAddress: string;
-  inputStartAmount: string;
-  outputTokenAddress: string;
-  outputTokenAmountOverride: string;
-  orderHash: string;
-  transactionHash: string;
-}
 
 
 
@@ -81,83 +72,40 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string>('');
 
 
-  // Load and parse CSV data
+  // Load data from MongoDB
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError('');
         
-        // Use the new order summary file
-        // Try to load from GitHub first, then fall back to local file
-        const githubUrl = 'https://raw.githubusercontent.com/LaTribuWeb3/uni-x-visualiser/refs/heads/main/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
-        const localUrl = '/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
+        // Load all transactions from API
+        const transactions = await apiService.getAllTransactions();
         
-        let response;
-        try {
-          // Try GitHub first
-          response = await fetch(githubUrl);
-          if (!response.ok) {
-            throw new Error(`GitHub fetch failed: ${response.status}`);
-          }
-        } catch (githubError) {
-          console.log('GitHub fetch failed, trying local file:', githubError);
-          // Fall back to local file
-          response = await fetch(localUrl);
-        }
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const csvText = await response.text();
-        
-        const results = Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true
-        });
-        
-        try {
-          const transactions = results.data as Transaction[];
-          
-          if (transactions.length === 0) {
-            setError('No data found in CSV file');
-            setLoading(false);
-            return;
-          }
-          
-          // Convert timestamps to dates and find range more efficiently
-          let minTimestamp = Infinity;
-          let maxTimestamp = -Infinity;
-          
-          transactions.forEach(transaction => {
-            const timestamp = parseInt(transaction.decayStartTime);
-            if (!isNaN(timestamp)) {
-              if (timestamp < minTimestamp) minTimestamp = timestamp;
-              if (timestamp > maxTimestamp) maxTimestamp = timestamp;
-            }
-          });
-          
-          if (minTimestamp === Infinity || maxTimestamp === -Infinity) {
-            setError('No valid timestamps found in data');
-            setLoading(false);
-            return;
-          }
-          
-          const minDate = fromUnixTime(minTimestamp);
-          const maxDate = fromUnixTime(maxTimestamp);
-          
-          setData(transactions);
-          setDataRange({ min: minDate, max: maxDate });
-          setStartDate(format(minDate, 'yyyy-MM-dd'));
-          setEndDate(format(maxDate, 'yyyy-MM-dd'));
+        if (transactions.length === 0) {
+          setError('No data found in database. Please run the CSV import script first.');
           setLoading(false);
-        } catch (parseError) {
-          setError(`Error processing data: ${parseError}`);
-          setLoading(false);
+          return;
         }
+        
+        // Get date range from API
+        const dateRange = await apiService.getDateRange();
+        
+        if (!dateRange) {
+          setError('No valid date range found in data');
+          setLoading(false);
+          return;
+        }
+        
+        setData(transactions);
+        setDataRange(dateRange);
+        setStartDate(format(dateRange.min, 'yyyy-MM-dd'));
+        setEndDate(format(dateRange.max, 'yyyy-MM-dd'));
+        setLoading(false);
+        
       } catch (err) {
-        setError(`Error loading CSV file: ${err}`);
+        console.error('API error:', err);
+        setError(`Error loading data from API: ${err}`);
         setLoading(false);
       }
     };
