@@ -103,7 +103,7 @@ app.get('/api/transactions', async (req, res) => {
     const transactions = await transactionsCollection
       .find({})
       .sort({ decayStartTimeTimestamp: -1 })
-      .limit(1000) // Limit to 1000 records for now
+      .limit(1000) // Limit to 1000 records for performance
       .toArray();
     
     console.log(`✅ Retrieved ${transactions.length} transactions`);
@@ -131,7 +131,7 @@ app.get('/api/transactions/filtered', async (req, res) => {
     } = req.query;
 
     // Build query
-    const query: any = {};
+    const query: Record<string, any> = {};
 
     if (startDate || endDate) {
       query.decayStartTimeTimestamp = {};
@@ -144,11 +144,11 @@ app.get('/api/transactions/filtered', async (req, res) => {
     }
 
     if (inputTokenAddress && inputTokenAddress !== 'all') {
-      query.inputTokenAddress = inputTokenAddress;
+      query.inputTokenAddress = inputTokenAddress as string;
     }
 
     if (outputTokenAddress && outputTokenAddress !== 'all') {
-      query.outputTokenAddress = outputTokenAddress;
+      query.outputTokenAddress = outputTokenAddress as string;
     }
 
     const [transactions, total] = await Promise.all([
@@ -279,7 +279,228 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// 404 handler
+// Get metadata (counts, date ranges, unique tokens)
+app.get('/api/transactions/metadata', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    console.log('📊 Fetching transaction metadata...');
+
+    // Get total count
+    const totalCount = await transactionsCollection.countDocuments({});
+
+    // Get date range
+    const [minResult, maxResult] = await Promise.all([
+      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: 1 } }),
+      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: -1 } })
+    ]);
+
+    // Get unique tokens (using aggregation for efficiency)
+    const uniqueTokens = await transactionsCollection.aggregate([
+      {
+        $group: {
+          _id: null,
+          inputTokens: { $addToSet: '$inputTokenAddress' },
+          outputTokens: { $addToSet: '$outputTokenAddress' }
+        }
+      }
+    ]).toArray();
+
+    const metadata = {
+      totalCount,
+      dateRange: {
+        min: minResult ? new Date(minResult.decayStartTimeTimestamp! * 1000) : null,
+        max: maxResult ? new Date(maxResult.decayStartTimeTimestamp! * 1000) : null
+      },
+      uniqueTokens: uniqueTokens.length > 0 ? {
+        inputTokens: uniqueTokens[0].inputTokens.sort(),
+        outputTokens: uniqueTokens[0].outputTokens.sort()
+      } : { inputTokens: [], outputTokens: [] }
+    };
+
+    console.log(`✅ Metadata: ${totalCount} transactions, ${metadata.uniqueTokens.inputTokens.length} unique input tokens, ${metadata.uniqueTokens.outputTokens.length} unique output tokens`);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error fetching metadata:', error);
+    res.status(500).json({ error: 'Failed to fetch metadata' });
+  }
+});
+
+// Get statistics without loading all data
+app.get('/api/transactions/statistics', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const { startDate, endDate } = req.query;
+    
+    // Build date filter
+    interface DateFilter {
+      decayStartTimeTimestamp?: {
+        $gte?: number;
+        $lte?: number;
+      };
+    }
+    
+    const dateFilter: DateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.decayStartTimeTimestamp = {};
+      if (startDate) {
+        dateFilter.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+      }
+      if (endDate) {
+        dateFilter.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+      }
+    }
+
+    console.log('📈 Computing statistics...');
+
+    // Get filtered count
+    const filteredCount = await transactionsCollection.countDocuments(dateFilter);
+
+    // Get token statistics using aggregation
+    const tokenStats = await transactionsCollection.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: null,
+          totalInputVolume: { $sum: { $toDouble: '$inputStartAmount' } },
+          totalOutputVolume: { $sum: { $toDouble: '$outputTokenAmountOverride' } },
+          uniqueInputTokens: { $addToSet: '$inputTokenAddress' },
+          uniqueOutputTokens: { $addToSet: '$outputTokenAddress' }
+        }
+      }
+    ]).toArray();
+
+    // Get top tokens by transaction count
+    const topInputTokens = await transactionsCollection.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$inputTokenAddress',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]).toArray();
+
+    const topOutputTokens = await transactionsCollection.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: '$outputTokenAddress',
+          count: { $sum: 1 },
+          totalVolume: { $sum: { $toDouble: '$outputTokenAmountOverride' } }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]).toArray();
+
+    const statistics = {
+      totalTransactions: filteredCount,
+      tokenStats: tokenStats.length > 0 ? {
+        totalInputVolume: tokenStats[0].totalInputVolume,
+        totalOutputVolume: tokenStats[0].totalOutputVolume,
+        uniqueInputTokens: tokenStats[0].uniqueInputTokens.length,
+        uniqueOutputTokens: tokenStats[0].uniqueOutputTokens.length
+      } : {
+        totalInputVolume: 0,
+        totalOutputVolume: 0,
+        uniqueInputTokens: 0,
+        uniqueOutputTokens: 0
+      },
+      topInputTokens,
+      topOutputTokens
+    };
+
+    console.log(`✅ Statistics: ${filteredCount} transactions in date range`);
+    res.json(statistics);
+  } catch (error) {
+    console.error('Error computing statistics:', error);
+    res.status(500).json({ error: 'Failed to compute statistics' });
+  }
+});
+
+// Get paginated transactions for display (efficient)
+app.get('/api/transactions/display', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const {
+      page = 1,
+      limit = 50,
+      startDate,
+      endDate,
+      inputTokenAddress,
+      outputTokenAddress,
+      sortBy = 'decayStartTimeTimestamp',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query: Record<string, any> = {};
+
+    if (startDate || endDate) {
+      query.decayStartTimeTimestamp = {};
+      if (startDate) {
+        query.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+      }
+      if (endDate) {
+        query.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+      }
+    }
+
+    if (inputTokenAddress && inputTokenAddress !== 'all') {
+      query.inputTokenAddress = inputTokenAddress as string;
+    }
+
+    if (outputTokenAddress && outputTokenAddress !== 'all') {
+      query.outputTokenAddress = outputTokenAddress as string;
+    }
+
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+    console.log(`📄 Fetching page ${page} with ${limit} items, skip: ${skip}`);
+
+    const [transactions, total] = await Promise.all([
+      transactionsCollection
+        .find(query)
+        .sort({ [sortBy as string]: sortDirection })
+        .skip(skip)
+        .limit(parseInt(limit as string))
+        .toArray(),
+      transactionsCollection.countDocuments(query)
+    ]);
+
+    const result = {
+      transactions,
+      pagination: {
+        currentPage: parseInt(page as string),
+        totalPages: Math.ceil(total / parseInt(limit as string)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit as string),
+        hasNextPage: skip + parseInt(limit as string) < total,
+        hasPrevPage: parseInt(page as string) > 1
+      }
+    };
+
+    console.log(`✅ Display: ${transactions.length} transactions for page ${page}/${result.pagination.totalPages}`);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching display data:', error);
+    res.status(500).json({ error: 'Failed to fetch display data' });
+  }
+});
+
+// 404 handler - must be last
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });

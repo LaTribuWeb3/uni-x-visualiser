@@ -27,36 +27,52 @@ const TransactionsTable: React.FC = () => {
   const [outputSearchValue, setOutputSearchValue] = useState<string>('');
   const [showInputSuggestions, setShowInputSuggestions] = useState<boolean>(false);
   const [showOutputSuggestions, setShowOutputSuggestions] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<{
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  } | null>(null);
+  const [metadata, setMetadata] = useState<{
+    totalCount: number;
+    dateRange: { min: Date | null; max: Date | null };
+    uniqueTokens: { inputTokens: string[]; outputTokens: string[] };
+  } | null>(null);
 
-  // Load data from MongoDB
+  // Load metadata and initial display data efficiently
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError('');
         
-        // Load all transactions from API
-        const transactions = await apiService.getAllTransactions();
+        console.log('🔄 Loading metadata and initial display data...');
         
-        if (transactions.length === 0) {
+        // Load metadata (counts, date ranges, unique tokens)
+        const metadataResult = await apiService.getMetadata();
+        setMetadata(metadataResult);
+        
+        if (metadataResult.totalCount === 0) {
           setError('No data found in database. Please run the CSV import script first.');
           setLoading(false);
           return;
         }
         
-        // Get date range from API
-        const dateRange = await apiService.getDateRange();
-        
-        if (!dateRange) {
-          setError('No valid date range found in data');
-          setLoading(false);
-          return;
+        // Set date range from metadata
+        if (metadataResult.dateRange.min && metadataResult.dateRange.max) {
+          setDataRange({
+            min: new Date(metadataResult.dateRange.min),
+            max: new Date(metadataResult.dateRange.max)
+          });
+          setStartDate(format(new Date(metadataResult.dateRange.min), 'yyyy-MM-dd'));
+          setEndDate(format(new Date(metadataResult.dateRange.max), 'yyyy-MM-dd'));
         }
         
-        setData(transactions);
-        setDataRange(dateRange);
-        setStartDate(format(dateRange.min, 'yyyy-MM-dd'));
-        setEndDate(format(dateRange.max, 'yyyy-MM-dd'));
+        // Load initial display data
+        await loadDisplayData();
+        
         setLoading(false);
         
       } catch (err) {
@@ -69,6 +85,34 @@ const TransactionsTable: React.FC = () => {
     loadData();
   }, []);
 
+  // Load display data with current filters and pagination
+  const loadDisplayData = async () => {
+    try {
+      const result = await apiService.getDisplayData({
+        page: currentPage,
+        limit: itemsPerPage,
+        startDate,
+        endDate,
+        inputTokenAddress: selectedInputToken,
+        outputTokenAddress: selectedOutputToken,
+        sortBy: sortConfig.key === 'decayStartTime' ? 'decayStartTimeTimestamp' : String(sortConfig.key),
+        sortOrder: sortConfig.direction
+      });
+      
+      setData(result.transactions);
+      setPagination(result.pagination);
+    } catch (err) {
+      console.error('Error loading display data:', err);
+      setError(`Error loading display data: ${err}`);
+    }
+  };
+
+  // Reload display data when filters or pagination change
+  useEffect(() => {
+    if (!loading) {
+      loadDisplayData();
+    }
+  }, [currentPage, startDate, endDate, selectedInputToken, selectedOutputToken, sortConfig]);
 
 
   // Get unique tokens for filtering

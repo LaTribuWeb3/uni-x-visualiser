@@ -70,37 +70,56 @@ const Dashboard: React.FC = () => {
   const [dataRange, setDataRange] = useState<{ min: Date; max: Date } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [metadata, setMetadata] = useState<{
+    totalCount: number;
+    dateRange: { min: Date | null; max: Date | null };
+    uniqueTokens: { inputTokens: string[]; outputTokens: string[] };
+  } | null>(null);
+  const [statistics, setStatistics] = useState<{
+    totalTransactions: number;
+    tokenStats: {
+      totalInputVolume: number;
+      totalOutputVolume: number;
+      uniqueInputTokens: number;
+      uniqueOutputTokens: number;
+    };
+    topInputTokens: Array<{ _id: string; count: number }>;
+    topOutputTokens: Array<{ _id: string; count: number; totalVolume: number }>;
+  } | null>(null);
 
-
-  // Load data from MongoDB
+  // Load metadata and statistics efficiently
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError('');
         
-        // Load all transactions from API
-        const transactions = await apiService.getAllTransactions();
+        console.log('🔄 Loading metadata and statistics...');
         
-        if (transactions.length === 0) {
+        // Load metadata (counts, date ranges, unique tokens)
+        const metadataResult = await apiService.getMetadata();
+        setMetadata(metadataResult);
+        
+        if (metadataResult.totalCount === 0) {
           setError('No data found in database. Please run the CSV import script first.');
           setLoading(false);
           return;
         }
         
-        // Get date range from API
-        const dateRange = await apiService.getDateRange();
-        
-        if (!dateRange) {
-          setError('No valid date range found in data');
-          setLoading(false);
-          return;
+        // Set date range from metadata
+        if (metadataResult.dateRange.min && metadataResult.dateRange.max) {
+          setDataRange({
+            min: new Date(metadataResult.dateRange.min),
+            max: new Date(metadataResult.dateRange.max)
+          });
+          setStartDate(format(new Date(metadataResult.dateRange.min), 'yyyy-MM-dd'));
+          setEndDate(format(new Date(metadataResult.dateRange.max), 'yyyy-MM-dd'));
         }
         
-        setData(transactions);
-        setDataRange(dateRange);
-        setStartDate(format(dateRange.min, 'yyyy-MM-dd'));
-        setEndDate(format(dateRange.max, 'yyyy-MM-dd'));
+        // Load initial statistics
+        const statsResult = await apiService.getStatistics();
+        setStatistics(statsResult);
+        
         setLoading(false);
         
       } catch (err) {
@@ -112,6 +131,25 @@ const Dashboard: React.FC = () => {
 
     loadData();
   }, []);
+
+  // Update statistics when date range changes
+  useEffect(() => {
+    const updateStatistics = async () => {
+      if (!startDate || !endDate) return;
+      
+      try {
+        const statsResult = await apiService.getStatistics({
+          startDate,
+          endDate
+        });
+        setStatistics(statsResult);
+      } catch (err) {
+        console.error('Error updating statistics:', err);
+      }
+    };
+
+    updateStatistics();
+  }, [startDate, endDate]);
 
   // Filter data based on date range
   useEffect(() => {
@@ -216,50 +254,16 @@ const Dashboard: React.FC = () => {
       .slice(0, 10); // Top 10 pairs
   };
 
-  // Get summary statistics
+  // Calculate summary stats using efficient backend statistics
   const getSummaryStats = () => {
-    const totalTransactions = filteredData.length;
-    const uniqueTransactions = new Set(filteredData.map(t => t.transactionHash)).size;
-    
-    // Count input tokens
-    const inputTokenCounts = new Map<string, number>();
-    filteredData.forEach(transaction => {
-      const inputToken = transaction.inputTokenAddress;
-      inputTokenCounts.set(inputToken, (inputTokenCounts.get(inputToken) || 0) + 1);
-    });
-    
-    // Count output tokens
-    const outputTokenCounts = new Map<string, number>();
-    filteredData.forEach(transaction => {
-      const outputToken = transaction.outputTokenAddress;
-      outputTokenCounts.set(outputToken, (outputTokenCounts.get(outputToken) || 0) + 1);
-    });
-    
-    // Count token pairs
-    const pairCounts = new Map<string, number>();
-    filteredData.forEach(transaction => {
-      const inputSymbol = getTokenName(transaction.inputTokenAddress);
-      const outputSymbol = getTokenName(transaction.outputTokenAddress);
-      const pair = `${inputSymbol} → ${outputSymbol}`;
-      pairCounts.set(pair, (pairCounts.get(pair) || 0) + 1);
-    });
-    
-    // Find most frequent
-    const mostSeenInputToken = Array.from(inputTokenCounts.entries())
-      .sort((a, b) => b[1] - a[1])[0] || ['None', 0];
-    
-    const mostSeenOutputToken = Array.from(outputTokenCounts.entries())
-      .sort((a, b) => b[1] - a[1])[0] || ['None', 0];
-    
-    const mostSeenPair = Array.from(pairCounts.entries())
-      .sort((a, b) => b[1] - a[1])[0] || ['None', 0];
+    if (!statistics) return null;
 
     return {
-      totalTransactions,
-      uniqueTransactions,
-      mostSeenInputToken: { token: mostSeenInputToken[0], count: mostSeenInputToken[1] },
-      mostSeenOutputToken: { token: mostSeenOutputToken[0], count: mostSeenOutputToken[1] },
-      mostSeenPair: { pair: mostSeenPair[0], count: mostSeenPair[1] }
+      totalTransactions: statistics.totalTransactions,
+      totalInputVolume: statistics.tokenStats.totalInputVolume,
+      totalOutputVolume: statistics.tokenStats.totalOutputVolume,
+      uniqueInputTokens: statistics.tokenStats.uniqueInputTokens,
+      uniqueOutputTokens: statistics.tokenStats.uniqueOutputTokens
     };
   };
 
@@ -365,29 +369,22 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Summary Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Transactions</h3>
-            <p className="text-3xl font-bold text-blue-600">{summaryStats.totalTransactions.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-blue-600">{summaryStats?.totalTransactions.toLocaleString() || '0'}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Transactions</h3>
-            <p className="text-3xl font-bold text-green-600">{summaryStats.uniqueTransactions.toLocaleString()}</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Input Tokens</h3>
+            <p className="text-3xl font-bold text-green-600">{summaryStats?.uniqueInputTokens.toLocaleString() || '0'}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Most Seen Input Token</h3>
-            <p className="text-lg font-bold text-purple-600">{getTokenName(summaryStats.mostSeenInputToken.token)}</p>
-            <p className="text-sm text-gray-500">{summaryStats.mostSeenInputToken.count} times</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Output Tokens</h3>
+            <p className="text-3xl font-bold text-purple-600">{summaryStats?.uniqueOutputTokens.toLocaleString() || '0'}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Most Seen Output Token</h3>
-            <p className="text-lg font-bold text-orange-600">{getTokenName(summaryStats.mostSeenOutputToken.token)}</p>
-            <p className="text-sm text-gray-500">{summaryStats.mostSeenOutputToken.count} times</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Most Seen Pair</h3>
-            <p className="text-lg font-bold text-indigo-600">{summaryStats.mostSeenPair.pair}</p>
-            <p className="text-sm text-gray-500">{summaryStats.mostSeenPair.count} times</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Output Volume</h3>
+            <p className="text-3xl font-bold text-orange-600">{summaryStats?.totalOutputVolume.toLocaleString() || '0'}</p>
           </div>
         </div>
 
