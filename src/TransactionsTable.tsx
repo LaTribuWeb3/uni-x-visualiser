@@ -320,6 +320,26 @@ const TransactionsTable: React.FC = () => {
     };
   };
 
+  // Calculate total input volume for current page only
+  const getCurrentPageInputVolume = () => {
+    if (selectedInputToken === 'all') return null;
+    
+    const currentPageVolumes = paginatedData.map(transaction => {
+      const inputDecimals = getTokenDecimals(transaction.inputTokenAddress);
+      return parseFloat(transaction.inputStartAmount) / Math.pow(10, inputDecimals);
+    });
+    
+    const totalVolume = currentPageVolumes.reduce((total, volume) => total + volume, 0);
+    const volumeInfo = formatVolume(totalVolume);
+    
+    return {
+      volume: totalVolume,
+      display: volumeInfo.display,
+      full: volumeInfo.full,
+      tokenName: getTokenName(selectedInputToken)
+    };
+  };
+
   const sortedData = sortData(filteredData);
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const paginatedData = sortedData.slice(
@@ -702,6 +722,20 @@ const TransactionsTable: React.FC = () => {
                       {Math.min(currentPage * itemsPerPage, sortedData.length)}
                     </span>{' '}
                     of <span className="font-medium">{sortedData.length}</span> results
+                    {(() => {
+                      const currentPageVolume = getCurrentPageInputVolume();
+                      if (currentPageVolume) {
+                        return (
+                          <span className="ml-2 text-blue-600 font-semibold">
+                            • Page {currentPageVolume.tokenName}: {currentPageVolume.display}
+                            <span className="text-xs text-gray-500 ml-1" title={currentPageVolume.full}>
+                              (hover for exact value)
+                            </span>
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </p>
                 </div>
                 <div>
