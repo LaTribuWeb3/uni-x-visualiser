@@ -149,11 +149,18 @@ const Dashboard: React.FC = () => {
       if (!startDate || !endDate) return;
       
       try {
-        const statsResult = await apiService.getStatistics({
-          startDate,
-          endDate
-        });
+        const [statsResult, pairsResult] = await Promise.all([
+          apiService.getStatistics({
+            startDate,
+            endDate
+          }),
+          apiService.getTokenPairs({
+            startDate,
+            endDate
+          })
+        ]);
         setStatistics(statsResult);
+        setTokenPairs(pairsResult.pairs);
       } catch (err) {
         console.error('Error updating statistics:', err);
       }
@@ -186,7 +193,7 @@ const Dashboard: React.FC = () => {
   const getTokenStats = (): TokenStats[] => {
     if (!statistics?.topOutputTokens) return [];
     
-    return statistics.topOutputTokens.map((token, index) => ({
+    return statistics.topOutputTokens.map((token) => ({
       token: token._id,
       count: token.count,
       totalVolume: token.totalVolume
