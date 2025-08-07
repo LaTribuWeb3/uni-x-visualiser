@@ -51,9 +51,6 @@ const swaggerOptions = {
             outputTokenAmountOverride: { type: 'string' },
             orderHash: { type: 'string' },
             transactionHash: { type: 'string' },
-            decayStartTimeTimestamp: { type: 'number' },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
             openPrice: { type: 'number' },
             closePrice: { type: 'number' },
             priceStatus: { 
@@ -390,8 +387,8 @@ app.get('/api/transactions/date-range', async (req, res) => {
     }
 
     const [minResult, maxResult] = await Promise.all([
-      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: 1 } }),
-      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: -1 } })
+      transactionsCollection.findOne({}, { sort: { decayStartTime: 1 } }),
+      transactionsCollection.findOne({}, { sort: { decayStartTime: -1 } })
     ]);
 
     if (!minResult || !maxResult) {
@@ -399,8 +396,8 @@ app.get('/api/transactions/date-range', async (req, res) => {
     }
 
     res.json({
-      min: new Date(minResult.decayStartTimeTimestamp! * 1000),
-      max: new Date(maxResult.decayStartTimeTimestamp! * 1000)
+      min: new Date(minResult.decayStartTime! * 1000),
+      max: new Date(maxResult.decayStartTime! * 1000)
     });
   } catch (error) {
     console.error('Error getting date range:', error);
@@ -446,9 +443,7 @@ app.post('/api/transactions', async (req, res) => {
     // Process transactions to add timestamps
     const processedTransactions = transactions.map(transaction => ({
       ...transaction,
-      decayStartTimeTimestamp: parseInt(transaction.decayStartTime),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      decayStartTimeTimestamp: parseInt(transaction.decayStartTime)
     }));
 
     await transactionsCollection.insertMany(processedTransactions);
@@ -502,8 +497,8 @@ app.get('/api/transactions/metadata', async (req, res) => {
 
     // Get date range
     const [minResult, maxResult] = await Promise.all([
-      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: 1 } }),
-      transactionsCollection.findOne({}, { sort: { decayStartTimeTimestamp: -1 } })
+      transactionsCollection.findOne({}, { sort: { decayStartTime: 1 } }),
+      transactionsCollection.findOne({}, { sort: { decayStartTime: -1 } })
     ]);
 
     // Get unique tokens (using aggregation for efficiency)
@@ -520,8 +515,8 @@ app.get('/api/transactions/metadata', async (req, res) => {
     const metadata = {
       totalCount,
       dateRange: {
-        min: minResult ? new Date(minResult.decayStartTimeTimestamp! * 1000) : null,
-        max: maxResult ? new Date(maxResult.decayStartTimeTimestamp! * 1000) : null
+        min: minResult ? new Date(minResult.decayStartTime! * 1000) : null,
+        max: maxResult ? new Date(maxResult.decayStartTime! * 1000) : null
       },
       uniqueTokens: uniqueTokens.length > 0 ? {
         inputTokens: uniqueTokens[0].inputTokens.sort(),

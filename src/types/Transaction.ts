@@ -1,5 +1,6 @@
 export interface Transaction {
   _id?: string;
+  decayStartTime: string;              // Original Unix timestamp as string
   inputTokenAddress: string;           // Input token contract address
   inputStartAmount: string;            // Input token amount as string
   outputTokenAddress: string;          // Output token contract address
