@@ -11,6 +11,8 @@ interface Transaction {
   outputTokenAmountOverride: string;
   orderHash: string;
   transactionHash: string;
+  openPrice?: string;
+  closePrice?: string;
 }
 
 interface DataContextType {

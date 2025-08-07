@@ -13,6 +13,8 @@ interface Transaction {
   outputTokenAmountOverride: string;
   orderHash: string;
   transactionHash: string;
+  openPrice?: string;
+  closePrice?: string;
 }
 
 interface SortConfig {
@@ -322,7 +324,7 @@ const TransactionsTable: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-none mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">Transactions Table</h1>
         
         {/* Date Range Selector */}
@@ -587,6 +589,12 @@ const TransactionsTable: React.FC = () => {
                     )}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Open Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Close Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Order Hash
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -648,6 +656,24 @@ const TransactionsTable: React.FC = () => {
                         >
                           {outputVolumeInfo.display} {getTokenName(transaction.outputTokenAddress)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {transaction.openPrice ? (
+                          <span className="font-semibold text-green-600">
+                            ${parseFloat(transaction.openPrice).toFixed(6)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">N/A</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {transaction.closePrice ? (
+                          <span className="font-semibold text-blue-600">
+                            ${parseFloat(transaction.closePrice).toFixed(6)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">N/A</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                         <button

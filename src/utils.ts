@@ -1338,6 +1338,11 @@ const tokens = [
     "address": "0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB",
     "name": "ETHFI",
     "decimals": 18
+  },
+  {
+    "address": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
+    "name": "MKR",
+    "decimals": 18
   }
 ];
 

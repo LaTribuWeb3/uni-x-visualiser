@@ -41,7 +41,7 @@ const Navigation: React.FC = () => {
   
   return (
     <nav className="bg-white shadow-md mb-6">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-none mx-auto px-4">
         <div className="flex justify-between items-center py-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Uni-X Visualizer</h1>
@@ -279,7 +279,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-none mx-auto px-4">
         <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Dashboard Overview</h2>
         
         {/* Date Range Selector */}
