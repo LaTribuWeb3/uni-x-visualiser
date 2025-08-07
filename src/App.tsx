@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Papa from 'papaparse';
 
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
+import { DataProvider, useData } from './DataContext';
 import './App.css';
 
 interface Transaction {
+  _id: string;
   decayStartTime: string;
   inputTokenAddress: string;
   inputStartAmount: string;
@@ -36,13 +37,21 @@ interface PairStats {
 // Navigation component
 const Navigation: React.FC = () => {
   const location = useLocation();
+  const { refreshData, loading, count } = useData();
   
   return (
     <nav className="bg-white shadow-md mb-6">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Uni-X Visualizer</h1>
-          <div className="flex space-x-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Uni-X Visualizer</h1>
+            {count > 0 && (
+              <p className="text-sm text-gray-600 mt-1">
+                {count.toLocaleString()} transactions loaded
+              </p>
+            )}
+          </div>
+          <div className="flex space-x-4 items-center">
             <Link
               to="/"
               className={`px-4 py-2 rounded-md font-medium transition-colors border ${
@@ -63,6 +72,18 @@ const Navigation: React.FC = () => {
             >
               Transactions Table
             </Link>
+            <button
+              onClick={refreshData}
+              disabled={loading}
+              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
+                loading
+                  ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
+                  : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
+              }`}
+              title="Refresh data from API"
+            >
+              {loading ? 'Refreshing...' : '🔄 Refresh'}
+            </button>
           </div>
         </div>
       </div>
@@ -72,98 +93,19 @@ const Navigation: React.FC = () => {
 
 // Dashboard component (existing App logic)
 const Dashboard: React.FC = () => {
-  const [data, setData] = useState<Transaction[]>([]);
+  const { data, dataRange, loading, error } = useData();
   const [filteredData, setFilteredData] = useState<Transaction[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [dataRange, setDataRange] = useState<{ min: Date; max: Date } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
 
 
-  // Load and parse CSV data
+  // Initialize date range when data is loaded
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        
-        // Use the new order summary file
-        // Try to load from GitHub first, then fall back to local file
-        const githubUrl = 'https://raw.githubusercontent.com/LaTribuWeb3/uni-x-visualiser/refs/heads/main/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
-        const localUrl = '/src/assets/order_summary_2025-08-04T14-13-09-803Z.csv';
-        
-        let response;
-        try {
-          // Try GitHub first
-          response = await fetch(githubUrl);
-          if (!response.ok) {
-            throw new Error(`GitHub fetch failed: ${response.status}`);
-          }
-        } catch (githubError) {
-          console.log('GitHub fetch failed, trying local file:', githubError);
-          // Fall back to local file
-          response = await fetch(localUrl);
-        }
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const csvText = await response.text();
-        
-        const results = Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true
-        });
-        
-        try {
-          const transactions = results.data as Transaction[];
-          
-          if (transactions.length === 0) {
-            setError('No data found in CSV file');
-            setLoading(false);
-            return;
-          }
-          
-          // Convert timestamps to dates and find range more efficiently
-          let minTimestamp = Infinity;
-          let maxTimestamp = -Infinity;
-          
-          transactions.forEach(transaction => {
-            const timestamp = parseInt(transaction.decayStartTime);
-            if (!isNaN(timestamp)) {
-              if (timestamp < minTimestamp) minTimestamp = timestamp;
-              if (timestamp > maxTimestamp) maxTimestamp = timestamp;
-            }
-          });
-          
-          if (minTimestamp === Infinity || maxTimestamp === -Infinity) {
-            setError('No valid timestamps found in data');
-            setLoading(false);
-            return;
-          }
-          
-          const minDate = fromUnixTime(minTimestamp);
-          const maxDate = fromUnixTime(maxTimestamp);
-          
-          setData(transactions);
-          setDataRange({ min: minDate, max: maxDate });
-          setStartDate(format(minDate, 'yyyy-MM-dd'));
-          setEndDate(format(maxDate, 'yyyy-MM-dd'));
-          setLoading(false);
-        } catch (parseError) {
-          setError(`Error processing data: ${parseError}`);
-          setLoading(false);
-        }
-      } catch (err) {
-        setError(`Error loading CSV file: ${err}`);
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
+    if (dataRange && data.length > 0) {
+      setStartDate(format(dataRange.min, 'yyyy-MM-dd'));
+      setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
+    }
+  }, [dataRange, data]);
 
   // Filter data based on date range
   useEffect(() => {
@@ -533,13 +475,15 @@ const Dashboard: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Navigation />
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/transactions" element={<TransactionsTable />} />
-      </Routes>
-    </Router>
+    <DataProvider>
+      <Router>
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/transactions" element={<TransactionsTable />} />
+        </Routes>
+      </Router>
+    </DataProvider>
   );
 };
 
