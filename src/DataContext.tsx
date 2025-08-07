@@ -49,7 +49,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       setError('');
       
       // Fetch data from the API endpoint
-      const response = await fetch('http://91.99.105.248:17500/api/transactions/recent');
+      const response = await fetch('https://mm.la-tribu.xyz/api/transactions/recent');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
