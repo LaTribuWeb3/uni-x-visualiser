@@ -207,6 +207,48 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Price enrichment methods
+  async enrichPrices(params: {
+    limit?: number;
+    skip?: number;
+    forceRefresh?: boolean;
+  } = {}): Promise<{
+    message: string;
+    processed: number;
+    enriched: number;
+    pending: number;
+    failed: number;
+  }> {
+    return this.fetchWithErrorHandling(`${API_BASE_URL}/transactions/enrich-prices`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async processPendingPrices(params: { limit?: number } = {}): Promise<{
+    message: string;
+    processed: number;
+    completed: number;
+    stillPending: number;
+    failed: number;
+  }> {
+    return this.fetchWithErrorHandling(`${API_BASE_URL}/transactions/process-pending-prices`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getPriceStatus(): Promise<{
+    total: number;
+    enriched: number;
+    pending: number;
+    failed: number;
+    noPrice: number;
+    enrichmentRate: number;
+  }> {
+    return this.fetchWithErrorHandling(`${API_BASE_URL}/transactions/price-status`);
+  }
 }
 
 export const apiService = new ApiService();

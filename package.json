@@ -8,16 +8,19 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "backend": "tsx src/backend.ts",
-    "dev:backend": "nodemon --exec tsx src/backend.ts",
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:backend\"",
+    "start-ui": "vite",
+    "start-backend": "npx tsx src/backend.ts",
+    "start-daemon": "npx tsx src/scripts/priceEnrichmentDaemon.ts",
     "import-csv": "tsx src/scripts/importCsv.ts",
     "import-csv:clear": "tsx src/scripts/importCsv.ts -- --clear",
-    "import-csv:help": "tsx src/scripts/importCsv.ts -- --help"
+    "import-csv:help": "tsx src/scripts/importCsv.ts -- --help",
+    "test-swagger": "node src/test-swagger.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
     "@types/papaparse": "^5.3.16",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",
@@ -27,6 +30,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
@@ -37,7 +42,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react-swc": "^3.10.2",
-    "concurrently": "^8.2.2",
+
     "eslint": "^9.30.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",

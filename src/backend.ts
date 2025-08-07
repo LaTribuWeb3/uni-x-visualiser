@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { MongoClient, Db, Collection } from 'mongodb';
-import { Transaction } from './types/Transaction';
+import type { Transaction } from './types/Transaction';
+import priceService from './services/priceService';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
 
 // Load environment variables
 dotenv.config();
@@ -16,6 +19,102 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Uni-X Visualizer API',
+      version: '1.0.0',
+      description: 'API for managing transactions and price enrichment',
+      contact: {
+        name: 'API Support',
+        email: 'support@example.com'
+      }
+    },
+    servers: [
+      {
+        url: `http://localhost:${PORT}`,
+        description: 'Development server'
+      }
+    ],
+    components: {
+      schemas: {
+        Transaction: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string' },
+            decayStartTime: { type: 'string' },
+            inputTokenAddress: { type: 'string' },
+            inputStartAmount: { type: 'string' },
+            outputTokenAddress: { type: 'string' },
+            outputTokenAmountOverride: { type: 'string' },
+            orderHash: { type: 'string' },
+            transactionHash: { type: 'string' },
+            decayStartTimeTimestamp: { type: 'number' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            priceData: {
+              type: 'object',
+              properties: {
+                openPrice: { type: 'number' },
+                closePrice: { type: 'number' },
+                highPrice: { type: 'number' },
+                lowPrice: { type: 'number' },
+                volume: { type: 'number' },
+                exactMatch: { type: 'boolean' },
+                priceFetchedAt: { type: 'string', format: 'date-time' },
+                priceJobId: { type: 'string' },
+                priceStatus: { 
+                  type: 'string', 
+                  enum: ['pending', 'completed', 'failed'] 
+                }
+              }
+            }
+          }
+        },
+        PriceStatus: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            enriched: { type: 'number' },
+            pending: { type: 'number' },
+            failed: { type: 'number' },
+            noPrice: { type: 'number' },
+            enrichmentRate: { type: 'number' }
+          }
+        },
+        EnrichmentResult: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            processed: { type: 'number' },
+            enriched: { type: 'number' },
+            pending: { type: 'number' },
+            failed: { type: 'number' }
+          }
+        },
+        PendingJobsResult: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            processed: { type: 'number' },
+            completed: { type: 'number' },
+            stillPending: { type: 'number' },
+            failed: { type: 'number' }
+          }
+        }
+      }
+    }
+  },
+  apis: ['./src/backend.ts'] // Path to the API docs
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Serve Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // MongoDB connection
 let client: MongoClient | null = null;
@@ -50,7 +149,7 @@ async function connectToMongoDB() {
     return true;
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB:');
-    console.error('   Error:', error.message);
+    console.error('   Error:', (error as Error).message);
     console.log('');
     console.log('🔧 To fix this:');
     console.log('   1. Make sure MongoDB is installed and running');
@@ -69,7 +168,34 @@ async function connectToMongoDB() {
   }
 }
 
-// Health check endpoint
+/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the health status of the API and MongoDB connection
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: API is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "OK"
+ *                 message:
+ *                   type: string
+ *                   example: "Uni-X Visualizer Backend is running"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 mongodb:
+ *                   type: string
+ *                   example: "Connected"
+ */
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -79,7 +205,33 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Get all transactions
+/**
+ * @swagger
+ * /api/transactions:
+ *   get:
+ *     summary: Get all transactions
+ *     description: Retrieves all transactions from the database (limited to 1000 for performance)
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: List of transactions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Transaction'
+ *       500:
+ *         description: Database connection error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Database not connected"
+ */
 app.get('/api/transactions', async (req, res) => {
   try {
     console.log('📡 GET /api/transactions - Request received');
@@ -110,11 +262,81 @@ app.get('/api/transactions', async (req, res) => {
     res.json(transactions);
   } catch (error) {
     console.error('❌ Error fetching transactions:', error);
-    res.status(500).json({ error: 'Failed to fetch transactions', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch transactions', details: (error as Error).message });
   }
 });
 
-// Get transactions with filtering and pagination
+/**
+ * @swagger
+ * /api/transactions/filtered:
+ *   get:
+ *     summary: Get filtered transactions
+ *     description: Retrieves transactions with filtering and pagination options
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for filtering (ISO format)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for filtering (ISO format)
+ *       - in: query
+ *         name: inputTokenAddress
+ *         schema:
+ *           type: string
+ *         description: Input token address filter
+ *       - in: query
+ *         name: outputTokenAddress
+ *         schema:
+ *           type: string
+ *         description: Output token address filter
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: number
+ *           default: 50
+ *         description: Number of transactions to return
+ *       - in: query
+ *         name: skip
+ *         schema:
+ *           type: number
+ *           default: 0
+ *         description: Number of transactions to skip
+ *     responses:
+ *       200:
+ *         description: Filtered transactions with pagination
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transactions:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Transaction'
+ *                 total:
+ *                   type: number
+ *                 page:
+ *                   type: number
+ *                 totalPages:
+ *                   type: number
+ *       500:
+ *         description: Database connection error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Database not connected"
+ */
 app.get('/api/transactions/filtered', async (req, res) => {
   try {
     if (!transactionsCollection) {
@@ -553,6 +775,333 @@ app.get('/api/transactions/pairs', async (req, res) => {
   } catch (error) {
     console.error('Error computing pair statistics:', error);
     res.status(500).json({ error: 'Failed to compute pair statistics' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/transactions/enrich-prices:
+ *   post:
+ *     summary: Enrich transactions with price data
+ *     description: Fetches and stores open/close prices for transactions using the pair pricing API
+ *     tags: [Price Enrichment]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               limit:
+ *                 type: number
+ *                 description: Number of transactions to process
+ *                 default: 100
+ *                 example: 50
+ *               skip:
+ *                 type: number
+ *                 description: Number of transactions to skip
+ *                 default: 0
+ *                 example: 0
+ *               forceRefresh:
+ *                 type: boolean
+ *                 description: Force refresh even if price data already exists
+ *                 default: false
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Price enrichment completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EnrichmentResult'
+ *       500:
+ *         description: Database connection error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Database not connected"
+ */
+app.post('/api/transactions/enrich-prices', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const { limit = 100, skip = 0, forceRefresh = false } = req.body;
+
+    console.log(`💰 Starting price enrichment for ${limit} transactions (skip: ${skip})`);
+
+    // Get transactions that need price data
+    const query: Record<string, any> = {};
+    if (!forceRefresh) {
+      query.$or = [
+        { priceData: { $exists: false } },
+        { 'priceData.priceStatus': { $in: ['pending', 'failed'] } }
+      ];
+    }
+
+    const transactions = await transactionsCollection
+      .find(query)
+      .sort({ decayStartTimeTimestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    console.log(`📊 Found ${transactions.length} transactions to enrich`);
+
+    let enrichedCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
+
+    for (const transaction of transactions) {
+      try {
+        const timestamp = transaction.decayStartTimeTimestamp || parseInt(transaction.decayStartTime);
+        
+        if (!timestamp) {
+          console.warn(`⚠️ No valid timestamp for transaction ${transaction._id}`);
+          continue;
+        }
+
+        const priceData = await priceService.fetchPriceData(
+          transaction.inputTokenAddress,
+          transaction.outputTokenAddress,
+          timestamp
+        );
+
+        if (priceData) {
+          // Update the transaction with price data
+          await transactionsCollection.updateOne(
+            { _id: transaction._id },
+            { 
+              $set: { 
+                priceData,
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          if (priceData.priceStatus === 'completed') {
+            enrichedCount++;
+            console.log(`✅ Enriched transaction ${transaction._id} with price data`);
+          } else if (priceData.priceStatus === 'pending') {
+            pendingCount++;
+            console.log(`⏳ Transaction ${transaction._id} price data pending`);
+          } else {
+            failedCount++;
+            console.log(`❌ Failed to get price data for transaction ${transaction._id}`);
+          }
+        } else {
+          failedCount++;
+          console.log(`❌ No price data available for transaction ${transaction._id}`);
+        }
+
+        // Add a small delay to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`❌ Error enriching transaction ${transaction._id}:`, error);
+        failedCount++;
+      }
+    }
+
+    const result = {
+      message: `Price enrichment completed`,
+      processed: transactions.length,
+      enriched: enrichedCount,
+      pending: pendingCount,
+      failed: failedCount
+    };
+
+    console.log(`✅ Price enrichment summary:`, result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error enriching prices:', error);
+    res.status(500).json({ error: 'Failed to enrich prices' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/transactions/process-pending-prices:
+ *   post:
+ *     summary: Process pending price jobs
+ *     description: Checks the status of pending price jobs and updates them with completed data
+ *     tags: [Price Enrichment]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               limit:
+ *                 type: number
+ *                 description: Number of pending jobs to process
+ *                 default: 100
+ *                 example: 50
+ *     responses:
+ *       200:
+ *         description: Pending jobs processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PendingJobsResult'
+ *       500:
+ *         description: Database connection error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Database not connected"
+ */
+app.post('/api/transactions/process-pending-prices', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const { limit = 100 } = req.body;
+
+    console.log(`🔄 Processing pending price jobs (limit: ${limit})`);
+
+    // Get transactions with pending price data
+    const pendingTransactions = await transactionsCollection
+      .find({ 'priceData.priceStatus': 'pending' })
+      .limit(limit)
+      .toArray();
+
+    console.log(`📊 Found ${pendingTransactions.length} pending transactions`);
+
+    let completedCount = 0;
+    let stillPendingCount = 0;
+    let failedCount = 0;
+
+    for (const transaction of pendingTransactions) {
+      try {
+        if (transaction.priceData?.priceJobId) {
+          const updatedPriceData = await priceService.checkJobStatus(transaction.priceData.priceJobId);
+          
+          if (updatedPriceData) {
+            // Update the transaction with new price data
+            await transactionsCollection.updateOne(
+              { _id: transaction._id },
+              { 
+                $set: { 
+                  priceData: updatedPriceData,
+                  updatedAt: new Date()
+                }
+              }
+            );
+
+            if (updatedPriceData.priceStatus === 'completed') {
+              completedCount++;
+              console.log(`✅ Job completed for transaction ${transaction._id}`);
+            } else if (updatedPriceData.priceStatus === 'pending') {
+              stillPendingCount++;
+              console.log(`⏳ Job still pending for transaction ${transaction._id}`);
+            } else {
+              failedCount++;
+              console.log(`❌ Job failed for transaction ${transaction._id}`);
+            }
+          } else {
+            failedCount++;
+            console.log(`❌ Could not check job status for transaction ${transaction._id}`);
+          }
+        }
+
+        // Add a small delay to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`❌ Error processing pending job for transaction ${transaction._id}:`, error);
+        failedCount++;
+      }
+    }
+
+    const result = {
+      message: `Pending price jobs processed`,
+      processed: pendingTransactions.length,
+      completed: completedCount,
+      stillPending: stillPendingCount,
+      failed: failedCount
+    };
+
+    console.log(`✅ Pending jobs summary:`, result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing pending prices:', error);
+    res.status(500).json({ error: 'Failed to process pending prices' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/transactions/price-status:
+ *   get:
+ *     summary: Get price enrichment status
+ *     description: Returns statistics about the price enrichment process
+ *     tags: [Price Enrichment]
+ *     responses:
+ *       200:
+ *         description: Price enrichment status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PriceStatus'
+ *       500:
+ *         description: Database connection error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Database not connected"
+ */
+app.get('/api/transactions/price-status', async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    const [
+      totalCount,
+      enrichedCount,
+      pendingCount,
+      failedCount,
+      noPriceCount
+    ] = await Promise.all([
+      transactionsCollection.countDocuments({}),
+      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'completed' }),
+      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'pending' }),
+      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'failed' }),
+      transactionsCollection.countDocuments({ 
+        $or: [
+          { priceData: { $exists: false } },
+          { priceData: { $eq: null } }
+        ]
+      } as any)
+    ]);
+
+    const status = {
+      total: totalCount,
+      enriched: enrichedCount,
+      pending: pendingCount,
+      failed: failedCount,
+      noPrice: noPriceCount,
+      enrichmentRate: totalCount > 0 ? Math.round((enrichedCount / totalCount) * 100) : 0
+    };
+
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting price status:', error);
+    res.status(500).json({ error: 'Failed to get price status' });
   }
 });
 
