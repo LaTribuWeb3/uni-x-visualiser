@@ -138,6 +138,40 @@ const TransactionsTable: React.FC = () => {
     };
   };
 
+  // Get unique transaction counts
+  const getUniqueTransactionCounts = () => {
+    const uniqueOrderHashes = new Set<string>();
+    const uniqueTransactionHashes = new Set<string>();
+    
+    data.forEach(transaction => {
+      uniqueOrderHashes.add(transaction.orderHash);
+      uniqueTransactionHashes.add(transaction.transactionHash);
+    });
+    
+    return {
+      uniqueOrders: uniqueOrderHashes.size,
+      uniqueTransactions: uniqueTransactionHashes.size,
+      totalRows: data.length
+    };
+  };
+
+  // Get unique transaction counts for filtered data
+  const getFilteredUniqueTransactionCounts = () => {
+    const uniqueOrderHashes = new Set<string>();
+    const uniqueTransactionHashes = new Set<string>();
+    
+    filteredData.forEach(transaction => {
+      uniqueOrderHashes.add(transaction.orderHash);
+      uniqueTransactionHashes.add(transaction.transactionHash);
+    });
+    
+    return {
+      uniqueOrders: uniqueOrderHashes.size,
+      uniqueTransactions: uniqueTransactionHashes.size,
+      totalRows: filteredData.length
+    };
+  };
+
   // Get filtered suggestions for autocomplete
   const getInputSuggestions = () => {
     if (!inputSearchValue.trim()) return [];
@@ -439,33 +473,55 @@ const TransactionsTable: React.FC = () => {
               />
             </div>
             <div className="text-sm text-gray-700 font-medium">
-              Showing {filteredData.length.toLocaleString()} of {data.length.toLocaleString()} transactions
               {(() => {
-                const totalVolume = getTotalInputVolume();
-                if (totalVolume) {
-                  return (
-                    <div className="mt-1 text-blue-600 font-semibold">
-                      <div>
-                        Total {totalVolume.tokenName}: {totalVolume.display}
-                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.full}>
-                          (hover for exact value)
+                const totalCounts = getUniqueTransactionCounts();
+                const filteredCounts = getFilteredUniqueTransactionCounts();
+                const hasDuplicates = totalCounts.totalRows !== totalCounts.uniqueOrders;
+                
+                return (
+                  <div>
+                    <div>
+                      Showing {filteredCounts.totalRows.toLocaleString()} of {totalCounts.totalRows.toLocaleString()} transaction rows
+                      {hasDuplicates && (
+                        <span className="text-orange-600 font-semibold ml-2">
+                          ({filteredCounts.uniqueOrders.toLocaleString()} unique orders)
                         </span>
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Mean: {totalVolume.meanDisplay}
-                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.meanFull}>
-                          (hover for exact value)
-                        </span>
-                        {' • '}
-                        Median: {totalVolume.medianDisplay}
-                        <span className="text-xs text-gray-500 ml-1" title={totalVolume.medianFull}>
-                          (hover for exact value)
-                        </span>
-                      </div>
+                      )}
                     </div>
-                  );
-                }
-                return null;
+                    {hasDuplicates && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Dataset contains {totalCounts.totalRows - totalCounts.uniqueOrders} duplicate order entries
+                      </div>
+                    )}
+                    {(() => {
+                      const totalVolume = getTotalInputVolume();
+                      if (totalVolume) {
+                        return (
+                          <div className="mt-1 text-blue-600 font-semibold">
+                            <div>
+                              Total {totalVolume.tokenName}: {totalVolume.display}
+                              <span className="text-xs text-gray-500 ml-1" title={totalVolume.full}>
+                                (hover for exact value)
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              Mean: {totalVolume.meanDisplay}
+                              <span className="text-xs text-gray-500 ml-1" title={totalVolume.meanFull}>
+                                (hover for exact value)
+                              </span>
+                              {' • '}
+                              Median: {totalVolume.medianDisplay}
+                              <span className="text-xs text-gray-500 ml-1" title={totalVolume.medianFull}>
+                                (hover for exact value)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                );
               })()}
             </div>
           </div>

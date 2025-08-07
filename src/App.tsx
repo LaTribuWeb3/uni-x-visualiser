@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
   // Get summary statistics
   const getSummaryStats = () => {
     const totalTransactions = filteredData.length;
-    const uniqueTransactions = new Set(filteredData.map(t => t.transactionHash)).size;
+    const uniqueTransactions = new Set(filteredData.map(t => t.orderHash)).size;
     
     // Count input tokens
     const inputTokenCounts = new Map<string, number>();
@@ -419,11 +419,11 @@ const Dashboard: React.FC = () => {
         {/* Summary Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Transactions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Orders</h3>
             <p className="text-3xl font-bold text-blue-600">{summaryStats.totalTransactions.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Transactions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unique Orders</h3>
             <p className="text-3xl font-bold text-green-600">{summaryStats.uniqueTransactions.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
