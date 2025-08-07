@@ -38,6 +38,7 @@ interface SimplifiedTransaction {
   outputTokenAmountOverride: string;
   openPrice: number;
   closePrice: number;
+  priceStatus?: string;
 }
 
 class PriceEnrichmentDaemon {
@@ -127,6 +128,7 @@ class PriceEnrichmentDaemon {
       const query = {
         $or: [
           { priceData: { $exists: false } },
+          { priceStatus: { $in: ['pending', 'failed'] } },
           { 'priceData.priceStatus': { $in: ['pending', 'failed'] } },
           // Also include transactions that have complex price data that needs transformation
           { 
@@ -162,17 +164,40 @@ class PriceEnrichmentDaemon {
     }
   }
 
-  async updateTransactionPriceData(transactionId: string, simplifiedData: SimplifiedTransaction): Promise<boolean> {
+  async updateTransactionPriceData(transactionId: string, simplifiedData: SimplifiedTransaction, priceStatus?: string): Promise<boolean> {
     try {
-      const result = await this.collection.updateOne(
+      // Get the current document to preserve essential fields
+      const currentDoc = await this.collection.findOne({ _id: transactionId });
+      if (!currentDoc) {
+        console.error(`❌ Document ${transactionId} not found`);
+        return false;
+      }
+
+      // Create the clean document structure
+      const cleanDocument = {
+        _id: currentDoc._id,
+        decayStartTime: currentDoc.decayStartTime,
+        inputTokenAddress: currentDoc.inputTokenAddress,
+        inputStartAmount: currentDoc.inputStartAmount,
+        outputTokenAddress: currentDoc.outputTokenAddress,
+        outputTokenAmountOverride: currentDoc.outputTokenAmountOverride,
+        orderHash: currentDoc.orderHash,
+        transactionHash: currentDoc.transactionHash,
+        // Simplified price fields
+        openPrice: simplifiedData.openPrice,
+        closePrice: simplifiedData.closePrice,
+        // Top-level price status
+        priceStatus: priceStatus || simplifiedData.priceStatus || 'pending',
+        // Update timestamp
+        updatedAt: new Date()
+      };
+
+      // Completely replace the document with the clean structure
+      const result = await this.collection.replaceOne(
         { _id: transactionId },
-        { 
-          $set: { 
-            ...simplifiedData,
-            updatedAt: new Date()
-          }
-        }
+        cleanDocument
       );
+
       return result.modifiedCount > 0;
     } catch (error) {
       console.error(`❌ Error updating transaction ${transactionId}:`, error);
@@ -209,7 +234,8 @@ class PriceEnrichmentDaemon {
           const transformedData = this.transformPriceData(transaction.priceData as unknown as Record<string, unknown>);
           if (transformedData) {
             const simplifiedTransaction = this.transformTransaction(transaction);
-            const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction);
+            const priceStatus = transaction.priceData?.priceStatus;
+            const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction, priceStatus);
             
             if (updated) {
               stats.enriched++;
@@ -247,7 +273,7 @@ class PriceEnrichmentDaemon {
             simplifiedTransaction.closePrice = transformedPriceData.closePrice;
           }
 
-          const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction);
+          const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction, priceData.priceStatus);
           
           if (updated) {
             stats.enriched++;

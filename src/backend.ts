@@ -9,7 +9,6 @@ import swaggerJsdoc from 'swagger-jsdoc';
 
 // Load environment variables
 dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -55,22 +54,11 @@ const swaggerOptions = {
             decayStartTimeTimestamp: { type: 'number' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
-            priceData: {
-              type: 'object',
-              properties: {
-                openPrice: { type: 'number' },
-                closePrice: { type: 'number' },
-                highPrice: { type: 'number' },
-                lowPrice: { type: 'number' },
-                volume: { type: 'number' },
-                exactMatch: { type: 'boolean' },
-                priceFetchedAt: { type: 'string', format: 'date-time' },
-                priceJobId: { type: 'string' },
-                priceStatus: { 
-                  type: 'string', 
-                  enum: ['pending', 'completed', 'failed'] 
-                }
-              }
+            openPrice: { type: 'number' },
+            closePrice: { type: 'number' },
+            priceStatus: { 
+              type: 'string', 
+              enum: ['pending', 'completed', 'failed'] 
             }
           }
         },
@@ -254,7 +242,6 @@ app.get('/api/transactions', async (req, res) => {
     // Add a limit to prevent timeout with large datasets
     const transactions = await transactionsCollection
       .find({})
-      .sort({ decayStartTimeTimestamp: -1 })
       .limit(1000) // Limit to 1000 records for performance
       .toArray();
     

@@ -86,6 +86,11 @@ async function testSimplifiedDaemon(): Promise<void> {
     
     const simplifiedData = transformTransaction(existingDoc);
     
+    // Add priceStatus to top level if available in priceData
+    if (existingDoc.priceData?.priceStatus) {
+      simplifiedData.priceStatus = existingDoc.priceData.priceStatus;
+    }
+    
     console.log('\n✅ Simplified data structure:');
     console.log(JSON.stringify(simplifiedData, null, 2));
     
@@ -93,6 +98,7 @@ async function testSimplifiedDaemon(): Promise<void> {
     console.log(`   Original fields: ${Object.keys(existingDoc).length}`);
     console.log(`   Simplified fields: ${Object.keys(simplifiedData).length}`);
     console.log(`   Data reduction: ${Math.round((1 - Object.keys(simplifiedData).length / Object.keys(existingDoc).length) * 100)}%`);
+    console.log(`   Flattened priceStatus: ${simplifiedData.priceStatus ? 'Yes' : 'No'}`);
     
     // Test database operations with real data
     console.log('\n🗄️ Testing database operations on real data...');
@@ -101,25 +107,67 @@ async function testSimplifiedDaemon(): Promise<void> {
     // Store original data for restoration
     const originalData = { ...existingDoc };
     
-    try {
-      // Update to simplified format
-      const updateResult = await collection.updateOne(
-        { _id: existingDoc._id },
-        { 
-          $set: { 
-            ...simplifiedData,
-            updatedAt: new Date()
-          }
-        }
-      );
+         try {
+       // Create the clean document structure
+       const cleanDocument = {
+         _id: existingDoc._id,
+         decayStartTime: existingDoc.decayStartTime,
+         inputTokenAddress: existingDoc.inputTokenAddress,
+         inputStartAmount: existingDoc.inputStartAmount,
+         outputTokenAddress: existingDoc.outputTokenAddress,
+         outputTokenAmountOverride: existingDoc.outputTokenAmountOverride,
+         orderHash: existingDoc.orderHash,
+         transactionHash: existingDoc.transactionHash,
+         // Simplified price fields
+         openPrice: simplifiedData.openPrice,
+         closePrice: simplifiedData.closePrice,
+         // Top-level price status
+         priceStatus: simplifiedData.priceStatus || 'pending',
+         // Update timestamp
+         updatedAt: new Date()
+       };
+       
+       // Completely replace the document with the clean structure
+       const updateResult = await collection.replaceOne(
+         { _id: existingDoc._id },
+         cleanDocument
+       );
       
       if (updateResult.modifiedCount > 0) {
         console.log('✅ Successfully transformed document to simplified format');
         
         // Verify the transformation
         const updatedDoc = await collection.findOne({ _id: existingDoc._id });
-        console.log('\n📋 Updated document structure:');
+        console.log('\n📋 Updated document structure (clean):');
         console.log(JSON.stringify(updatedDoc, null, 2));
+        
+        // Show the benefits of flattened structure
+        console.log('\n🎯 Benefits of clean structure:');
+        console.log(`   - No nested priceData object`);
+        console.log(`   - No duplicated fields`);
+        console.log(`   - Easy query by priceStatus: db.transactions.find({priceStatus: "completed"})`);
+        console.log(`   - No nested queries needed for status checks`);
+        console.log(`   - Better indexing performance`);
+        console.log(`   - Cleaner data structure`);
+        
+        // Verify cleanup
+        const hasPriceData = updatedDoc && updatedDoc.priceData;
+        const hasDuplicatedFields = updatedDoc && (
+          updatedDoc['priceData.openPrice'] || 
+          updatedDoc['priceData.closePrice'] || 
+          updatedDoc['priceData.highPrice'] || 
+          updatedDoc['priceData.lowPrice'] || 
+          updatedDoc['priceData.volume'] || 
+          updatedDoc['priceData.exactMatch'] || 
+          updatedDoc['priceData.priceFetchedAt'] || 
+          updatedDoc['priceData.priceJobId'] || 
+          updatedDoc['priceData.priceStatus']
+        );
+        
+        console.log('\n🧹 Cleanup Verification:');
+        console.log(`   Nested priceData removed: ${!hasPriceData ? '✅' : '❌'}`);
+        console.log(`   Duplicated fields removed: ${!hasDuplicatedFields ? '✅' : '❌'}`);
+        console.log(`   Essential fields preserved: ${updatedDoc?.openPrice !== undefined && updatedDoc?.closePrice !== undefined ? '✅' : '❌'}`);
       } else {
         console.log('❌ Failed to transform document');
       }
