@@ -30,6 +30,16 @@ interface EnrichmentStats {
   skipped: number;
 }
 
+// Simplified transaction interface
+interface SimplifiedTransaction {
+  inputTokenAddress: string;
+  inputStartAmount: string;
+  outputTokenAddress: string;
+  outputTokenAmountOverride: string;
+  openPrice: number;
+  closePrice: number;
+}
+
 class PriceEnrichmentDaemon {
   private client: MongoClient | null = null;
   private collection: any = null;
@@ -61,12 +71,81 @@ class PriceEnrichmentDaemon {
     }
   }
 
+  /**
+   * Transform complex price data to simplified format
+   */
+  private transformPriceData(complexPriceData: Record<string, unknown>): { openPrice: number; closePrice: number } | null {
+    if (!complexPriceData) return null;
+
+    // Handle existing complex price data structure
+    if (typeof complexPriceData.openPrice === 'number' && typeof complexPriceData.closePrice === 'number') {
+      return {
+        openPrice: complexPriceData.openPrice,
+        closePrice: complexPriceData.closePrice
+      };
+    }
+
+    // Handle API response format
+    if (complexPriceData.result) {
+      const result = complexPriceData.result as Record<string, unknown>;
+      return {
+        openPrice: (result.open as number) || 0,
+        closePrice: (result.close as number) || 0
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Transform transaction to simplified format
+   */
+  private transformTransaction(transaction: Transaction): SimplifiedTransaction {
+    const simplified: SimplifiedTransaction = {
+      inputTokenAddress: transaction.inputTokenAddress,
+      inputStartAmount: transaction.inputStartAmount,
+      outputTokenAddress: transaction.outputTokenAddress,
+      outputTokenAmountOverride: transaction.outputTokenAmountOverride,
+      openPrice: 0,
+      closePrice: 0
+    };
+
+    // Transform existing price data if available
+    if (transaction.priceData) {
+      const transformedPriceData = this.transformPriceData(transaction.priceData as unknown as Record<string, unknown>);
+      if (transformedPriceData) {
+        simplified.openPrice = transformedPriceData.openPrice;
+        simplified.closePrice = transformedPriceData.closePrice;
+      }
+    }
+
+    return simplified;
+  }
+
   async getTransactionsNeedingEnrichment(limit: number, skip: number = 0): Promise<Transaction[]> {
     try {
       const query = {
         $or: [
           { priceData: { $exists: false } },
-          { 'priceData.priceStatus': { $in: ['pending', 'failed'] } }
+          { 'priceData.priceStatus': { $in: ['pending', 'failed'] } },
+          // Also include transactions that have complex price data that needs transformation
+          { 
+            $and: [
+              { 'priceData.openPrice': { $exists: true } },
+              { 'priceData.closePrice': { $exists: true } },
+              { 
+                $or: [
+                  { 'priceData.highPrice': { $exists: true } },
+                  { 'priceData.lowPrice': { $exists: true } },
+                  { 'priceData.volume': { $exists: true } },
+                  { 'priceData.exactMatch': { $exists: true } },
+                  { 'priceData.priceFetchedAt': { $exists: true } },
+                  { 'priceData.priceJobId': { $exists: true } },
+                  { 'priceData.priceStatus': { $exists: true } }
+                ]
+              }
+            ]
+          }
         ]
       };
 
@@ -83,13 +162,13 @@ class PriceEnrichmentDaemon {
     }
   }
 
-  async updateTransactionPriceData(transactionId: string, priceData: any): Promise<boolean> {
+  async updateTransactionPriceData(transactionId: string, simplifiedData: SimplifiedTransaction): Promise<boolean> {
     try {
       const result = await this.collection.updateOne(
         { _id: transactionId },
         { 
           $set: { 
-            priceData,
+            ...simplifiedData,
             updatedAt: new Date()
           }
         }
@@ -114,13 +193,36 @@ class PriceEnrichmentDaemon {
 
     for (const transaction of transactions) {
       try {
-        // Skip if already has completed price data
-        if (transaction.priceData?.priceStatus === 'completed') {
+        // Check if transaction already has simplified price data
+        const hasSimplifiedData = transaction.openPrice !== undefined && 
+                                 transaction.closePrice !== undefined &&
+                                 transaction.priceData === undefined;
+
+        if (hasSimplifiedData) {
           stats.skipped++;
+          console.log(`⏭️ Transaction ${transaction._id} already has simplified format`);
           continue;
         }
 
-        // Parse timestamp
+        // Transform existing complex data if available
+        if (transaction.priceData) {
+          const transformedData = this.transformPriceData(transaction.priceData as unknown as Record<string, unknown>);
+          if (transformedData) {
+            const simplifiedTransaction = this.transformTransaction(transaction);
+            const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction);
+            
+            if (updated) {
+              stats.enriched++;
+              console.log(`✅ Transformed existing price data for transaction ${transaction._id}`);
+            } else {
+              stats.failed++;
+              console.log(`❌ Failed to transform existing data for transaction ${transaction._id}`);
+            }
+            continue;
+          }
+        }
+
+        // Parse timestamp for new price data
         const timestamp = parseInt(transaction.decayStartTime);
         if (isNaN(timestamp)) {
           console.warn(`⚠️ Invalid timestamp for transaction ${transaction._id}`);
@@ -128,32 +230,35 @@ class PriceEnrichmentDaemon {
           continue;
         }
 
-        // Fetch price data
+        // Fetch new price data
         const priceData = await priceService.fetchPriceData(
           transaction.inputTokenAddress,
           transaction.outputTokenAddress,
           timestamp
         );
 
-        if (priceData) {
-          // Update transaction with price data
-          const updated = await this.updateTransactionPriceData(transaction._id, priceData);
+        if (priceData && priceData.priceStatus === 'completed') {
+          // Transform to simplified format
+          const simplifiedTransaction = this.transformTransaction(transaction);
+          const transformedPriceData = this.transformPriceData(priceData as unknown as Record<string, unknown>);
+          
+          if (transformedPriceData) {
+            simplifiedTransaction.openPrice = transformedPriceData.openPrice;
+            simplifiedTransaction.closePrice = transformedPriceData.closePrice;
+          }
+
+          const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction);
           
           if (updated) {
-            if (priceData.priceStatus === 'completed') {
-              stats.enriched++;
-              console.log(`✅ Enriched transaction ${transaction._id} with price data`);
-            } else if (priceData.priceStatus === 'pending') {
-              stats.pending++;
-              console.log(`⏳ Transaction ${transaction._id} price data pending`);
-            } else {
-              stats.failed++;
-              console.log(`❌ Transaction ${transaction._id} price data failed`);
-            }
+            stats.enriched++;
+            console.log(`✅ Enriched transaction ${transaction._id} with simplified price data`);
           } else {
             stats.failed++;
             console.log(`❌ Failed to update transaction ${transaction._id}`);
           }
+        } else if (priceData && priceData.priceStatus === 'pending') {
+          stats.pending++;
+          console.log(`⏳ Transaction ${transaction._id} price data pending`);
         } else {
           stats.failed++;
           console.log(`❌ No price data available for transaction ${transaction._id}`);
@@ -233,13 +338,14 @@ class PriceEnrichmentDaemon {
       return;
     }
 
-          console.log('🚀 Starting Price Enrichment Daemon...');
-      console.log(`📊 Configuration:`);
-      console.log(`   Batch Size: ${this.config.processing.batchSize}`);
-      console.log(`   Interval: ${this.config.processing.intervalMs / 1000} seconds`);
-      console.log(`   Max Retries: ${this.config.processing.maxRetries}`);
-      console.log(`   Request Delay: ${this.config.processing.delayBetweenRequests}ms`);
-    
+    console.log('🚀 Starting Price Enrichment Daemon...');
+    console.log(`📊 Configuration:`);
+    console.log(`   Batch Size: ${this.config.processing.batchSize}`);
+    console.log(`   Interval: ${this.config.processing.intervalMs / 1000} seconds`);
+    console.log(`   Max Retries: ${this.config.processing.maxRetries}`);
+    console.log(`   Request Delay: ${this.config.processing.delayBetweenRequests}ms`);
+    console.log(`   Data Format: Simplified (inputTokenAddress, inputStartAmount, outputTokenAddress, outputTokenAmountOverride, openPrice, closePrice)`);
+  
     this.isRunning = true;
 
     // Run initial cycle

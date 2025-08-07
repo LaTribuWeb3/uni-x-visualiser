@@ -10,7 +10,7 @@ export interface Transaction {
   decayStartTimeTimestamp?: number;    // Parsed Unix timestamp for queries
   createdAt?: Date;                    // Document creation timestamp
   updatedAt?: Date;                    // Document update timestamp
-  // Price data fields
+  // Price data fields (complex format)
   priceData?: {
     openPrice?: number;                // Open price from pair pricing API
     closePrice?: number;               // Close price from pair pricing API
@@ -22,6 +22,9 @@ export interface Transaction {
     priceJobId?: string;              // Job ID from the pricing API
     priceStatus?: 'pending' | 'completed' | 'failed'; // Status of price fetch
   };
+  // Simplified price fields (flat format)
+  openPrice?: number;                  // Simplified open price
+  closePrice?: number;                 // Simplified close price
 }
 
 export interface TransactionFilters {

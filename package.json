@@ -14,7 +14,8 @@
     "import-csv": "tsx src/scripts/importCsv.ts",
     "import-csv:clear": "tsx src/scripts/importCsv.ts -- --clear",
     "import-csv:help": "tsx src/scripts/importCsv.ts -- --help",
-    "test-swagger": "node src/test-swagger.js"
+    "test-swagger": "node src/test-swagger.js",
+    "test-simplified-daemon": "npx tsx src/scripts/testSimplifiedDaemon.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
