@@ -143,7 +143,7 @@ class PriceService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`HTTP ${response.status} on ${url}: ${response.statusText}`);
       }
 
       const data: PriceApiResponse = await response.json();
@@ -176,11 +176,11 @@ class PriceService {
         };
       } else {
         console.warn(`⚠️ Unexpected response status: ${data.status}`);
-        return null;
+        throw new Error(`Unexpected response status: ${data.status}`);
       }
     } catch (error) {
       console.error(`❌ Error fetching price data:`, error);
-      return null;
+      throw new Error(`❌ Error fetching price data: ${error instanceof Error ? error.stack : 'Unknown error'}`);
     }
   }
 

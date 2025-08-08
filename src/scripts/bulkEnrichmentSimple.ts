@@ -100,7 +100,7 @@ async function bulkEnrichmentSimple() {
         }
         
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? (error.stack || error.message) : String(error);
         console.error(`❌ ${transaction._id} - Error: ${errorMessage}`);
         
         errors.push({
