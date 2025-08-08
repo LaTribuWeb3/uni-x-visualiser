@@ -1,5 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import apiService from '../services/api';
+import { uploadStateManager, type UploadState } from '../services/uploadState';
+import { uploadMonitor, type UploadStatus } from '../services/uploadMonitor';
 
 interface UploadResult {
   message: string;
@@ -28,16 +30,47 @@ interface UploadProgress {
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError }) => {
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>(uploadStateManager.getState());
+  const [backendUploadStatus, setBackendUploadStatus] = useState<UploadStatus>({ isUploading: false });
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [error, setError] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Subscribe to global upload state changes and backend monitoring
+  useEffect(() => {
+    // Check for stale upload state on component mount
+    uploadStateManager.checkForStaleUpload();
+    
+    const unsubscribe = uploadStateManager.subscribe((state) => {
+      setUploadState(state);
+    });
+
+    // Start monitoring backend uploads
+    uploadMonitor.startMonitoring();
+    const unsubscribeBackend = uploadMonitor.subscribe((status) => {
+      setBackendUploadStatus(status);
+      console.log('🔍 Backend upload status:', status);
+    });
+
+    // Set up periodic activity updates during uploads
+    const activityInterval = setInterval(() => {
+      if (uploadState.isUploading) {
+        uploadStateManager.updateLastActivity();
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => {
+      unsubscribe();
+      unsubscribeBackend();
+      uploadMonitor.stopMonitoring();
+      clearInterval(activityInterval);
+    };
+  }, [uploadState.isUploading]);
+
   const updateProgress = (stage: UploadProgress['stage'], message: string, progress?: number, details?: string) => {
-    setUploadProgress({ stage, message, progress, details });
+    uploadStateManager.updateProgress({ stage, message, progress, details });
+    uploadStateManager.updateLastActivity();
     console.log(`📊 [${stage.toUpperCase()}] ${message}${details ? ` - ${details}` : ''}`);
   };
 
@@ -52,14 +85,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
 
     // Validate file size (500MB limit)
     if (file.size > 500 * 1024 * 1024) {
-      setError('File size must be less than 500MB');
+      uploadStateManager.setError('File size must be less than 500MB');
       return;
     }
 
-    setIsUploading(true);
-    setError('');
+    // Check if there's already an upload in progress (frontend or backend)
+    if (uploadState.isUploading || backendUploadStatus.isUploading) {
+      console.log('⚠️ Upload already in progress, ignoring new file');
+      if (backendUploadStatus.isUploading) {
+        uploadStateManager.setError('Upload already in progress on the server. Please wait for it to complete.');
+      }
+      return;
+    }
+
+    uploadStateManager.startUpload(file.name, `${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    uploadStateManager.updateLastActivity();
     setUploadResult(null);
-    setUploadProgress(null);
     setSelectedFile(file);
 
     try {
@@ -114,24 +155,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
         updateProgress(stage, message, progressData.progress, details);
       });
       
-      console.log('✅ Upload successful:', result);
-      setUploadResult(result);
-      
-      if (onUploadSuccess) {
-        onUploadSuccess(result);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-      console.error('❌ Upload failed:', errorMessage);
-      setError(errorMessage);
-      updateProgress('error', 'Upload failed', undefined, errorMessage);
-      
-      if (onUploadError) {
-        onUploadError(errorMessage);
-      }
-    } finally {
-      setIsUploading(false);
-    }
+             console.log('✅ Upload successful:', result);
+       setUploadResult(result);
+       uploadStateManager.completeUpload();
+       
+       if (onUploadSuccess) {
+         onUploadSuccess(result);
+       }
+     } catch (err) {
+       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+       console.error('❌ Upload failed:', errorMessage);
+       uploadStateManager.setError(errorMessage);
+       
+       if (onUploadError) {
+         onUploadError(errorMessage);
+       }
+     }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -166,8 +205,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
 
   const handleClearResult = () => {
     setUploadResult(null);
-    setError('');
-    setUploadProgress(null);
+    uploadStateManager.clearState();
     setSelectedFile(null);
   };
 
@@ -217,7 +255,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
           dragActive 
             ? 'border-blue-500 bg-blue-50 scale-105' 
             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-        } ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                 } ${uploadState.isUploading ? 'opacity-50 pointer-events-none' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
@@ -226,73 +264,73 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
         <div className="space-y-4">
           <div className="text-6xl text-gray-400 transition-transform duration-300 hover:scale-110">📁</div>
           
-          {isUploading ? (
+                     {uploadState.isUploading ? (
             <div className="space-y-6">
-              {/* File Info Card */}
-              {selectedFile && (
+                             {/* File Info Card */}
+               {uploadState.fileInfo && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-center space-x-3">
                     <div className="text-blue-600 text-2xl">📄</div>
-                    <div className="text-left">
-                      <div className="font-medium text-blue-900">{selectedFile.name}</div>
-                      <div className="text-sm text-blue-700">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</div>
-                    </div>
+                                         <div className="text-left">
+                       <div className="font-medium text-blue-900">{uploadState.fileInfo.name}</div>
+                       <div className="text-sm text-blue-700">{uploadState.fileInfo.size}</div>
+                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Progress Display */}
-              {uploadProgress && (
+                             {/* Progress Display */}
+               {uploadState.progress && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="text-3xl animate-pulse">{getProgressIcon(uploadProgress.stage)}</span>
-                    <div className="text-center">
-                      <div className={`text-lg font-medium ${getProgressColor(uploadProgress.stage)}`}>
-                        {uploadProgress.message}
-                      </div>
-                      {uploadProgress.details && (
-                        <div className="text-sm text-gray-600 mt-1">{uploadProgress.details}</div>
-                      )}
-                    </div>
-                  </div>
+                                     <div className="flex items-center justify-center space-x-3">
+                     <span className="text-3xl animate-pulse">{getProgressIcon(uploadState.progress.stage)}</span>
+                     <div className="text-center">
+                       <div className={`text-lg font-medium ${getProgressColor(uploadState.progress.stage)}`}>
+                         {uploadState.progress.message}
+                       </div>
+                       {uploadState.progress.details && (
+                         <div className="text-sm text-gray-600 mt-1">{uploadState.progress.details}</div>
+                       )}
+                     </div>
+                   </div>
                   
-                  {uploadProgress.progress !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Progress</span>
-                        <span>{uploadProgress.progress}%</span>
-                      </div>
-                                             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                                     {uploadState.progress.progress !== undefined && (
+                     <div className="space-y-2">
+                       <div className="flex justify-between text-sm text-gray-600">
+                         <span>Progress</span>
+                         <span>{uploadState.progress.progress}%</span>
+                       </div>
+                       <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
                          <div 
-                           className={`h-4 rounded-full transition-all duration-500 ease-out shadow-lg bg-gradient-to-r ${getProgressBarColor(uploadProgress.stage)}`}
-                           style={{ width: `${uploadProgress.progress}%` }}
+                           className={`h-4 rounded-full transition-all duration-500 ease-out shadow-lg bg-gradient-to-r ${getProgressBarColor(uploadState.progress.stage)}`}
+                           style={{ width: `${uploadState.progress.progress}%` }}
                          >
                            <div className="h-full bg-white opacity-30 animate-pulse"></div>
                          </div>
                        </div>
-                    </div>
-                  )}
+                     </div>
+                   )}
                   
-                  {/* Stage Indicators */}
-                  <div className="flex justify-center space-x-2">
-                    {['uploading', 'parsing', 'validating', 'inserting'].map((stage) => (
-                      <div
-                        key={stage}
-                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                          uploadProgress.stage === stage 
-                            ? 'bg-blue-100 text-blue-800 scale-110 shadow-md'
-                            : uploadProgress.stage === 'complete' || uploadProgress.stage === 'error'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {stage.charAt(0).toUpperCase() + stage.slice(1)}
-                      </div>
-                    ))}
-                  </div>
+                                     {/* Stage Indicators */}
+                   <div className="flex justify-center space-x-2">
+                     {['uploading', 'parsing', 'validating', 'inserting'].map((stage) => (
+                       <div
+                         key={stage}
+                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
+                           uploadState.progress.stage === stage 
+                             ? 'bg-blue-100 text-blue-800 scale-110 shadow-md'
+                             : uploadState.progress.stage === 'complete' || uploadState.progress.stage === 'error'
+                             ? 'bg-green-100 text-green-800'
+                             : 'bg-gray-100 text-gray-500'
+                         }`}
+                       >
+                         {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                       </div>
+                     ))}
+                   </div>
 
-                  {/* Processing Animation */}
-                  {uploadProgress.stage !== 'complete' && uploadProgress.stage !== 'error' && (
+                   {/* Processing Animation */}
+                   {uploadState.progress.stage !== 'complete' && uploadState.progress.stage !== 'error' && (
                     <div className="flex justify-center space-x-1">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -302,21 +340,41 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
                 </div>
               )}
             </div>
-          ) : (
-            <>
-              <div className="text-lg font-medium text-gray-700">
-                Drop your CSV file here, or{' '}
-                <button
-                  type="button"
-                  onClick={handleBrowseClick}
-                  className="text-blue-600 hover:text-blue-800 underline transition-colors"
-                >
-                  browse
-                </button>
-              </div>
-              <div className="text-sm text-gray-500">
-                Supports CSV files up to 500MB
-              </div>
+                     ) : (
+             <>
+                               {uploadState.isUploading || backendUploadStatus.isUploading ? (
+                  <div className="text-center space-y-4">
+                    <div className="text-lg font-medium text-blue-700">
+                      📤 Upload in Progress
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {backendUploadStatus.isUploading && !uploadState.isUploading ? (
+                        <>
+                          <div>Server is processing: {backendUploadStatus.currentFile}</div>
+                          <div>Stage: {backendUploadStatus.stage} ({backendUploadStatus.progress}%)</div>
+                        </>
+                      ) : (
+                        'Please wait for the current upload to complete before starting a new one.'
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                 <>
+                   <div className="text-lg font-medium text-gray-700">
+                     Drop your CSV file here, or{' '}
+                     <button
+                       type="button"
+                       onClick={handleBrowseClick}
+                       className="text-blue-600 hover:text-blue-800 underline transition-colors"
+                     >
+                       browse
+                     </button>
+                   </div>
+                   <div className="text-sm text-gray-500">
+                     Supports CSV files up to 500MB
+                   </div>
+                 </>
+               )}
               
               {/* File Preview */}
               {selectedFile && !isUploading && (
@@ -343,19 +401,19 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
         className="hidden"
       />
 
-      {/* Error Display */}
-      {error && (
+             {/* Error Display */}
+       {uploadState.error && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg animate-pulse">
           <div className="flex items-center">
             <div className="text-red-600 text-xl mr-2">❌</div>
-            <div className="text-red-800 font-medium">{error}</div>
+                         <div className="text-red-800 font-medium">{uploadState.error}</div>
           </div>
-          <button
-            onClick={() => setError('')}
-            className="mt-2 text-red-600 hover:text-red-800 text-sm underline transition-colors"
-          >
-            Dismiss
-          </button>
+                     <button
+             onClick={() => uploadStateManager.clearState()}
+             className="mt-2 text-red-600 hover:text-red-800 text-sm underline transition-colors"
+           >
+             Dismiss
+           </button>
         </div>
       )}
 

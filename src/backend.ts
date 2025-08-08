@@ -215,6 +215,18 @@ let client: MongoClient | null = null;
 let db: Db | null = null;
 let transactionsCollection: Collection<Transaction> | null = null;
 
+// Upload tracking
+let currentUpload: {
+  isUploading: boolean;
+  currentFile?: string;
+  progress?: number;
+  stage?: string;
+  startTime?: number;
+  lastActivity?: number;
+} = {
+  isUploading: false
+};
+
 async function connectToMongoDB() {
   try {
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
@@ -309,6 +321,38 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     mongodb: client ? 'Connected' : 'Disconnected'
   });
+});
+
+/**
+ * @swagger
+ * /api/upload/status:
+ *   get:
+ *     summary: Get current upload status
+ *     description: Returns the current upload status and progress
+ *     tags: [Upload]
+ *     responses:
+ *       200:
+ *         description: Current upload status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isUploading:
+ *                   type: boolean
+ *                 currentFile:
+ *                   type: string
+ *                 progress:
+ *                   type: number
+ *                 stage:
+ *                   type: string
+ *                 startTime:
+ *                   type: number
+ *                 lastActivity:
+ *                   type: number
+ */
+app.get('/api/upload/status', (req, res) => {
+  res.json(currentUpload);
 });
 
 /**
@@ -623,12 +667,27 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // Update upload tracking
+    currentUpload = {
+      isUploading: true,
+      currentFile: req.file.originalname,
+      progress: 0,
+      stage: 'started',
+      startTime: Date.now(),
+      lastActivity: Date.now()
+    };
+
     const fileSizeMB = (req.file.size / 1024 / 1024).toFixed(2);
     console.log(`📁 Processing uploaded file: ${req.file.originalname} (${fileSizeMB}MB)`);
 
     // Set response headers for streaming
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Update upload tracking
+    currentUpload.stage = 'started';
+    currentUpload.progress = 0;
+    currentUpload.lastActivity = Date.now();
 
     // Send initial response to start streaming
     res.write(JSON.stringify({ 
@@ -639,6 +698,10 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
 
     // Stage 1: Read and parse CSV
     console.log('📄 Reading CSV file...');
+    currentUpload.stage = 'reading';
+    currentUpload.progress = 10;
+    currentUpload.lastActivity = Date.now();
+    
     res.write(JSON.stringify({ 
       stage: 'reading',
       message: 'Reading CSV file...',
@@ -796,6 +859,14 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       invalidCount: invalidCount,
       duplicateCount: duplicateCount,
       totalRows: parseResult.data.length
+    };
+
+    // Update upload tracking - completed
+    currentUpload = {
+      isUploading: false,
+      progress: 100,
+      stage: 'complete',
+      lastActivity: Date.now()
     };
 
     console.log('🎉 Upload processing complete:', finalResult);
