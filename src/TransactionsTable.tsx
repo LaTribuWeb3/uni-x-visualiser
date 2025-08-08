@@ -211,8 +211,17 @@ const TransactionsTable: React.FC = () => {
           break;
         }
         default:
-          aValue = a[sortConfig.key];
-          bValue = b[sortConfig.key];
+          // Type guard to ensure we only access valid Transaction properties
+          if (sortConfig.key in a && sortConfig.key in b) {
+            const aProp = a[sortConfig.key as keyof Transaction];
+            const bProp = b[sortConfig.key as keyof Transaction];
+            aValue = aProp ?? '';
+            bValue = bProp ?? '';
+          } else {
+            // Fallback for invalid keys
+            aValue = '';
+            bValue = '';
+          }
       }
 
       if (aValue < bValue) {
