@@ -1,5 +1,10 @@
 export const tokens = [
   {
+    address: "0x0000000000000000000000000000000000000000",
+    name: "ETH",
+    decimals: 18,
+  },
+  {
     address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     name: "WETH",
     decimals: 18,

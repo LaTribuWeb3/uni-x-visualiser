@@ -53,10 +53,6 @@ class PriceService {
    * and apply token translations (e.g., WETH -> ETH)
    */
   private getTokenName(address: string): string | null {
-    // Handle zero address
-    if (address === '0x0000000000000000000000000000000000000000') {
-      return null;
-    }
     
     const normalizedAddress = address.toLowerCase();
     const token = tokens.find(t => t.address.toLowerCase() === normalizedAddress);

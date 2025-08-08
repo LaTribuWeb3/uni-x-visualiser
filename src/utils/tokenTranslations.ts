@@ -30,8 +30,8 @@ export function translateTokenName(tokenName: string): string {
   const normalizedName = tokenName.toUpperCase();
   
   // Convert WETH to ETH for price API compatibility
-  if (normalizedName === 'WETH') {
-    return 'ETH';
+  if (normalizedName === 'ETH') {
+    return 'WETH';
   }
   
   // Return original name for all other tokens
