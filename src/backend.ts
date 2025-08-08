@@ -199,6 +199,7 @@ function validateTransaction(row: CsvRow, index: number): Transaction | null {
   }
 
   return {
+    _id: row.transactionHash.toLowerCase(), // Use transactionHash as _id
     transactionHash: row.transactionHash.toLowerCase(), // Primary identifier
     decayStartTime: timestamp, // Store as number timestamp
     inputTokenAddress: row.inputTokenAddress.toLowerCase(),
@@ -625,11 +626,34 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
     const fileSizeMB = (req.file.size / 1024 / 1024).toFixed(2);
     console.log(`📁 Processing uploaded file: ${req.file.originalname} (${fileSizeMB}MB)`);
 
+    // Set response headers for streaming
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Send initial response to start streaming
+    res.write(JSON.stringify({ 
+      stage: 'started',
+      message: 'Starting file processing...',
+      progress: 0
+    }) + '\n');
+
     // Stage 1: Read and parse CSV
     console.log('📄 Reading CSV file...');
+    res.write(JSON.stringify({ 
+      stage: 'reading',
+      message: 'Reading CSV file...',
+      progress: 10
+    }) + '\n');
+
     const csvContent = fs.readFileSync(req.file.path, 'utf-8');
     
     console.log('🔍 Parsing CSV content...');
+    res.write(JSON.stringify({ 
+      stage: 'parsing',
+      message: 'Parsing CSV content...',
+      progress: 20
+    }) + '\n');
+
     const parseResult = Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
@@ -638,26 +662,44 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
 
     if (parseResult.errors.length > 0) {
       console.error('❌ CSV parsing errors:', parseResult.errors);
-      return res.status(400).json({ 
-        error: 'CSV parsing failed', 
-        details: parseResult.errors 
-      });
+      res.write(JSON.stringify({ 
+        stage: 'error',
+        message: 'CSV parsing failed',
+        details: parseResult.errors
+      }) + '\n');
+      res.end();
+      return;
     }
 
     console.log(`📊 Parsed ${parseResult.data.length} rows from CSV`);
+    res.write(JSON.stringify({ 
+      stage: 'parsed',
+      message: `Parsed ${parseResult.data.length} rows from CSV`,
+      progress: 30,
+      totalRows: parseResult.data.length
+    }) + '\n');
 
-    // Stage 2: Validate and transform data
+    // Stage 2: Validate and transform data in batches
     console.log('✅ Validating transactions...');
+    res.write(JSON.stringify({ 
+      stage: 'validating',
+      message: 'Validating transactions...',
+      progress: 40
+    }) + '\n');
+
     const validTransactions: Transaction[] = [];
     let invalidCount = 0;
     const totalRows = parseResult.data.length;
+    const batchSize = 500; // Smaller batches for better progress reporting
+    const totalBatches = Math.ceil(totalRows / batchSize);
 
-    // Process in batches for better progress reporting
-    const batchSize = 1000;
     for (let i = 0; i < totalRows; i += batchSize) {
       const batch = parseResult.data.slice(i, i + batchSize);
-      console.log(`🔍 Validating batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (rows ${i + 1}-${Math.min(i + batchSize, totalRows)})`);
+      const batchNumber = Math.floor(i / batchSize) + 1;
       
+      console.log(`🔍 Validating batch ${batchNumber}/${totalBatches} (rows ${i + 1}-${Math.min(i + batchSize, totalRows)})`);
+      
+      // Process batch
       batch.forEach((row: any, index: number) => {
         const transaction = validateTransaction(row, i + index);
         if (transaction) {
@@ -666,34 +708,99 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
           invalidCount++;
         }
       });
+
+      // Send progress update
+      const validationProgress = 40 + (batchNumber / totalBatches) * 30;
+      res.write(JSON.stringify({ 
+        stage: 'validating',
+        message: `Validated batch ${batchNumber}/${totalBatches}`,
+        progress: Math.round(validationProgress),
+        validCount: validTransactions.length,
+        invalidCount: invalidCount,
+        totalRows: totalRows
+      }) + '\n');
     }
 
     console.log(`✅ Validation complete: ${validTransactions.length} valid, ${invalidCount} invalid`);
+    res.write(JSON.stringify({ 
+      stage: 'validated',
+      message: `Validation complete: ${validTransactions.length} valid, ${invalidCount} invalid`,
+      progress: 70,
+      validCount: validTransactions.length,
+      invalidCount: invalidCount
+    }) + '\n');
 
     if (validTransactions.length === 0) {
       console.log('❌ No valid transactions found in file');
-      return res.status(400).json({ error: 'No valid transactions found in file' });
+      res.write(JSON.stringify({ 
+        stage: 'error',
+        message: 'No valid transactions found in file'
+      }) + '\n');
+      res.end();
+      return;
     }
 
-    // Stage 3: Insert transactions into database (no additional processing needed)
+    // Stage 3: Insert transactions into database in batches
     console.log('🗄️ Inserting transactions into database...');
-    const insertResult = await transactionsCollection.insertMany(validTransactions);
-    console.log(`✅ Successfully inserted ${insertResult.insertedCount} transactions`);
+    res.write(JSON.stringify({ 
+      stage: 'inserting',
+      message: 'Inserting transactions into database...',
+      progress: 75
+    }) + '\n');
+
+    const insertBatchSize = 1000;
+    let insertedCount = 0;
+    let duplicateCount = 0;
+
+    for (let i = 0; i < validTransactions.length; i += insertBatchSize) {
+      const batch = validTransactions.slice(i, i + insertBatchSize);
+      
+      try {
+        const insertResult = await transactionsCollection.insertMany(batch, { 
+          ordered: false // Continue on errors (duplicates)
+        });
+        
+        insertedCount += insertResult.insertedCount;
+        const batchDuplicates = batch.length - insertResult.insertedCount;
+        duplicateCount += batchDuplicates;
+        
+        console.log(`✅ Inserted batch ${Math.floor(i / insertBatchSize) + 1}: ${insertResult.insertedCount} inserted, ${batchDuplicates} duplicates`);
+        
+        // Send progress update
+        const insertProgress = 75 + ((i + insertBatchSize) / validTransactions.length) * 20;
+        res.write(JSON.stringify({ 
+          stage: 'inserting',
+          message: `Inserted batch ${Math.floor(i / insertBatchSize) + 1}`,
+          progress: Math.min(95, Math.round(insertProgress)),
+          insertedCount: insertedCount,
+          duplicateCount: duplicateCount,
+          totalValid: validTransactions.length
+        }) + '\n');
+        
+      } catch (error) {
+        console.error('❌ Error inserting batch:', error);
+        // Continue with next batch
+      }
+    }
 
     // Clean up uploaded file
     console.log('🧹 Cleaning up uploaded file...');
     fs.unlinkSync(req.file.path);
 
-    const result = { 
-      message: `Successfully imported ${validTransactions.length} transactions`,
-      count: validTransactions.length,
+    const finalResult = { 
+      stage: 'complete',
+      message: `Successfully imported ${insertedCount} transactions`,
+      progress: 100,
+      count: insertedCount,
       validCount: validTransactions.length,
       invalidCount: invalidCount,
+      duplicateCount: duplicateCount,
       totalRows: parseResult.data.length
     };
 
-    console.log('🎉 Upload processing complete:', result);
-    res.json(result);
+    console.log('🎉 Upload processing complete:', finalResult);
+    res.write(JSON.stringify(finalResult) + '\n');
+    res.end();
 
   } catch (error) {
     console.error('❌ Error processing uploaded file:', error);
@@ -708,7 +815,12 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       }
     }
     
-    res.status(500).json({ error: 'Failed to process uploaded file' });
+    res.write(JSON.stringify({ 
+      stage: 'error',
+      message: 'Failed to process uploaded file',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }) + '\n');
+    res.end();
   }
 });
 

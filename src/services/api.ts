@@ -250,11 +250,24 @@ class ApiService {
     return this.fetchWithErrorHandling(`${API_BASE_URL}/transactions/price-status`);
   }
 
-  async uploadCsvFile(file: File): Promise<{
+  async uploadCsvFile(
+    file: File,
+    onProgress?: (data: {
+      stage: string;
+      message: string;
+      progress: number;
+      validCount?: number;
+      invalidCount?: number;
+      insertedCount?: number;
+      duplicateCount?: number;
+      totalRows?: number;
+    }) => void
+  ): Promise<{
     message: string;
     count: number;
     validCount: number;
     invalidCount: number;
+    duplicateCount: number;
     totalRows: number;
   }> {
     const formData = new FormData();
@@ -271,7 +284,51 @@ class ApiService {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      let finalResult: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        // Convert Uint8Array to string
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            
+            // Call progress callback if provided
+            if (onProgress) {
+              onProgress(data);
+            }
+
+            // Store final result
+            if (data.stage === 'complete' || data.stage === 'error') {
+              finalResult = data;
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse streaming response:', parseError);
+          }
+        }
+      }
+
+      if (!finalResult) {
+        throw new Error('No final result received from server');
+      }
+
+      if (finalResult.stage === 'error') {
+        throw new Error(finalResult.message || 'Upload failed');
+      }
+
+      return finalResult;
     } catch (error) {
       console.error('File upload failed:', error);
       if (error instanceof Error) {

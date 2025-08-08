@@ -6,6 +6,7 @@ interface UploadResult {
   count: number;
   validCount: number;
   invalidCount: number;
+  duplicateCount: number;
   totalRows: number;
 }
 
@@ -65,43 +66,52 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       console.log(`📤 Starting upload: ${file.name} (${fileSizeMB}MB)`);
       
-      // Stage 1: Upload
-      updateProgress('uploading', `Uploading ${file.name}...`, 0, `${fileSizeMB}MB`, {
-        name: file.name,
-        size: `${fileSizeMB}MB`
-      });
-      
-      // Simulate upload progress (since we can't track actual upload progress with fetch)
-      const uploadInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev && prev.stage === 'uploading' && prev.progress && prev.progress < 90) {
-            return { ...prev, progress: prev.progress + 10 };
-          }
-          return prev;
-        });
-      }, 200);
-
-      const result = await apiService.uploadCsvFile(file);
-      
-      clearInterval(uploadInterval);
-      
-      // Stage 2: Processing
-      updateProgress('parsing', 'Parsing CSV file...', 90, `${result.totalRows} rows detected`);
-      
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      updateProgress('validating', 'Validating transactions...', 95, `Checking ${result.totalRows} rows`);
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      updateProgress('inserting', 'Inserting into database...', 98, `${result.validCount} valid transactions`);
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Stage 3: Complete
-      updateProgress('complete', 'Upload completed successfully!', 100, `${result.validCount} valid transactions imported`, {
-        name: file.name,
-        size: `${fileSizeMB}MB`,
-        rows: result.totalRows
+      // Handle real-time progress updates
+      const result = await apiService.uploadCsvFile(file, (progressData) => {
+        console.log('📊 Progress update:', progressData);
+        
+        // Map backend stages to frontend stages
+        let stage: UploadProgress['stage'] = 'uploading';
+        let message = progressData.message;
+        let details = '';
+        
+        switch (progressData.stage) {
+          case 'started':
+            stage = 'uploading';
+            break;
+          case 'reading':
+            stage = 'uploading';
+            break;
+          case 'parsing':
+            stage = 'parsing';
+            break;
+          case 'parsed':
+            stage = 'parsing';
+            details = `${progressData.totalRows} rows detected`;
+            break;
+          case 'validating':
+            stage = 'validating';
+            details = `Validated ${progressData.validCount || 0}/${progressData.totalRows || 0} rows`;
+            break;
+          case 'validated':
+            stage = 'validating';
+            details = `${progressData.validCount} valid, ${progressData.invalidCount} invalid`;
+            break;
+          case 'inserting':
+            stage = 'inserting';
+            details = `Inserted ${progressData.insertedCount || 0}/${progressData.totalValid || 0} transactions`;
+            break;
+          case 'complete':
+            stage = 'complete';
+            details = `${progressData.count} transactions imported`;
+            break;
+          case 'error':
+            stage = 'error';
+            details = progressData.message;
+            break;
+        }
+        
+        updateProgress(stage, message, progressData.progress, details);
       });
       
       console.log('✅ Upload successful:', result);
@@ -187,13 +197,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
 
   const getProgressBarColor = (stage: string) => {
     switch (stage) {
-      case 'uploading': return 'bg-blue-500';
-      case 'parsing': return 'bg-yellow-500';
-      case 'validating': return 'bg-orange-500';
-      case 'inserting': return 'bg-purple-500';
-      case 'complete': return 'bg-green-500';
-      case 'error': return 'bg-red-500';
-      default: return 'bg-blue-500';
+      case 'uploading': return 'bg-blue-600 shadow-blue-500/50';
+      case 'parsing': return 'bg-yellow-500 shadow-yellow-500/50';
+      case 'validating': return 'bg-orange-500 shadow-orange-500/50';
+      case 'inserting': return 'bg-purple-600 shadow-purple-500/50';
+      case 'complete': return 'bg-green-600 shadow-green-500/50';
+      case 'error': return 'bg-red-600 shadow-red-500/50';
+      default: return 'bg-blue-600 shadow-blue-500/50';
     }
   };
 
@@ -252,14 +262,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
                         <span>Progress</span>
                         <span>{uploadProgress.progress}%</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                        <div 
-                          className={`h-4 rounded-full transition-all duration-500 ease-out ${getProgressBarColor(uploadProgress.stage)}`}
-                          style={{ width: `${uploadProgress.progress}%` }}
-                        >
-                          <div className="h-full bg-white opacity-20 animate-pulse"></div>
-                        </div>
-                      </div>
+                                             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                         <div 
+                           className={`h-4 rounded-full transition-all duration-500 ease-out shadow-lg bg-gradient-to-r ${getProgressBarColor(uploadProgress.stage)}`}
+                           style={{ width: `${uploadProgress.progress}%` }}
+                         >
+                           <div className="h-full bg-white opacity-30 animate-pulse"></div>
+                         </div>
+                       </div>
                     </div>
                   )}
                   
@@ -377,6 +387,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
             <div className="bg-white p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
               <div className="font-medium text-gray-700">Invalid Rows</div>
               <div className="text-3xl font-bold text-red-600">{uploadResult.invalidCount}</div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
+              <div className="font-medium text-gray-700">Duplicates</div>
+              <div className="text-3xl font-bold text-orange-600">{uploadResult.duplicateCount}</div>
             </div>
             <div className="bg-white p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
               <div className="font-medium text-gray-700">Success Rate</div>

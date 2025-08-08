@@ -1,5 +1,5 @@
 export interface Transaction {
-  _id?: string;                       // MongoDB auto-generated ID (optional)
+  _id: string;                        // MongoDB ID - now using transactionHash as _id
   transactionHash: string;             // Primary identifier - Ethereum transaction hash
   decayStartTime: number;              // Unix timestamp as number (stored only once)
   inputTokenAddress: string;           // Input token contract address
