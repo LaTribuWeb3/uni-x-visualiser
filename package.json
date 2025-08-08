@@ -12,7 +12,8 @@
     "start-backend": "npx tsx src/backend.ts",
     "start-daemon": "npx tsx src/scripts/priceEnrichmentDaemon.ts",
     "test-swagger": "node src/test-swagger.js",
-    "test-simplified-daemon": "npx tsx src/scripts/testSimplifiedDaemon.ts"
+    "test-simplified-daemon": "npx tsx src/scripts/testSimplifiedDaemon.ts",
+    "enrich-all": "npx tsx src/scripts/enrichAllTransactions.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",

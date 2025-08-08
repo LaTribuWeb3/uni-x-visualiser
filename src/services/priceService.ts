@@ -1,6 +1,7 @@
 import { tokens } from '../assets/tokens';
 import dotenv from 'dotenv';
 import { translateTokenName } from '../utils/tokenTranslations';
+import type { Transaction } from '../types/Transaction';
 
 // Load environment variables
 dotenv.config();
@@ -116,6 +117,7 @@ class PriceService {
 
   /**
    * Fetch price data for a token pair at a specific timestamp
+   * If the original pair doesn't exist, try the reverse pair and invert the price
    */
   async fetchPriceData(
     inputTokenAddress: string, 
@@ -131,52 +133,116 @@ class PriceService {
         return null;
       }
 
-      const url = `${this.apiUrl}?inputToken=${inputTokenName}&outputToken=${outputTokenName}&timestamp=${timestamp}`;
-      
+      // Try the original pair first
+      const originalUrl = `${this.apiUrl}?inputToken=${inputTokenName}&outputToken=${outputTokenName}&timestamp=${timestamp}`;
       console.log(`🔍 Fetching price for ${inputTokenName}/${outputTokenName} at ${timestamp}`);
 
-      const response = await this.fetchWithRetry(url, {
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-          'Content-Type': 'application/json'
+      try {
+        const response = await this.fetchWithRetry(originalUrl, {
+          headers: {
+            'Authorization': `Bearer ${this.apiToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} on ${originalUrl}: ${response.statusText}`);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} on ${url}: ${response.statusText}`);
-      }
+        const data: PriceApiResponse = await response.json();
+        
+        if (data.status === 'completed' && data.result) {
+          console.log(`✅ Price data received for ${inputTokenName}/${outputTokenName}`);
+          return {
+            openPrice: data.result.open,
+            closePrice: data.result.close,
+            highPrice: data.result.high,
+            lowPrice: data.result.low,
+            volume: data.result.volume,
+            exactMatch: data.result.exactMatch,
+            priceFetchedAt: new Date(),
+            priceJobId: data.jobId,
+            priceStatus: 'completed' as const
+          };
+        } else if (data.status === 'processing') {
+          console.log(`⏳ Price data processing for ${inputTokenName}/${outputTokenName} (Job ID: ${data.jobId})`);
+          return {
+            openPrice: 0,
+            closePrice: 0,
+            highPrice: 0,
+            lowPrice: 0,
+            volume: 0,
+            exactMatch: false,
+            priceFetchedAt: new Date(),
+            priceJobId: data.jobId,
+            priceStatus: 'pending' as const
+          };
+        } else {
+          console.warn(`⚠️ Unexpected response status: ${data.status}`);
+          throw new Error(`Unexpected response status: ${data.status}`);
+        }
+      } catch (originalError) {
+        // If original pair failed, try the reverse pair
+        console.log(`⚠️ Original pair ${inputTokenName}/${outputTokenName} failed, trying reverse pair ${outputTokenName}/${inputTokenName}`);
+        
+        const reverseUrl = `${this.apiUrl}?inputToken=${outputTokenName}&outputToken=${inputTokenName}&timestamp=${timestamp}`;
+        
+        try {
+          const reverseResponse = await this.fetchWithRetry(reverseUrl, {
+            headers: {
+              'Authorization': `Bearer ${this.apiToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
 
-      const data: PriceApiResponse = await response.json();
-      
-      if (data.status === 'completed' && data.result) {
-        console.log(`✅ Price data received for ${inputTokenName}/${outputTokenName}`);
-        return {
-          openPrice: data.result.open,
-          closePrice: data.result.close,
-          highPrice: data.result.high,
-          lowPrice: data.result.low,
-          volume: data.result.volume,
-          exactMatch: data.result.exactMatch,
-          priceFetchedAt: new Date(),
-          priceJobId: data.jobId,
-          priceStatus: 'completed' as const
-        };
-      } else if (data.status === 'processing') {
-        console.log(`⏳ Price data processing for ${inputTokenName}/${outputTokenName} (Job ID: ${data.jobId})`);
-        return {
-          openPrice: 0,
-          closePrice: 0,
-          highPrice: 0,
-          lowPrice: 0,
-          volume: 0,
-          exactMatch: false,
-          priceFetchedAt: new Date(),
-          priceJobId: data.jobId,
-          priceStatus: 'pending' as const
-        };
-      } else {
-        console.warn(`⚠️ Unexpected response status: ${data.status}`);
-        throw new Error(`Unexpected response status: ${data.status}`);
+          if (!reverseResponse.ok) {
+            throw new Error(`HTTP ${reverseResponse.status} on ${reverseUrl}: ${reverseResponse.statusText}`);
+          }
+
+          const reverseData: PriceApiResponse = await reverseResponse.json();
+          
+          if (reverseData.status === 'completed' && reverseData.result) {
+            console.log(`✅ Price data received for reverse pair ${outputTokenName}/${inputTokenName}, inverting prices`);
+            
+            // Invert the prices: price of AB = 1 / (price of BA)
+            const invertedOpenPrice = 1 / reverseData.result.open;
+            const invertedClosePrice = 1 / reverseData.result.close;
+            const invertedHighPrice = 1 / reverseData.result.low; // High becomes low when inverted
+            const invertedLowPrice = 1 / reverseData.result.high; // Low becomes high when inverted
+            
+            return {
+              openPrice: invertedOpenPrice,
+              closePrice: invertedClosePrice,
+              highPrice: invertedHighPrice,
+              lowPrice: invertedLowPrice,
+              volume: reverseData.result.volume,
+              exactMatch: reverseData.result.exactMatch,
+              priceFetchedAt: new Date(),
+              priceJobId: reverseData.jobId,
+              priceStatus: 'completed' as const
+            };
+          } else if (reverseData.status === 'processing') {
+            console.log(`⏳ Price data processing for reverse pair ${outputTokenName}/${inputTokenName} (Job ID: ${reverseData.jobId})`);
+            return {
+              openPrice: 0,
+              closePrice: 0,
+              highPrice: 0,
+              lowPrice: 0,
+              volume: 0,
+              exactMatch: false,
+              priceFetchedAt: new Date(),
+              priceJobId: reverseData.jobId,
+              priceStatus: 'pending' as const
+            };
+          } else {
+            console.warn(`⚠️ Unexpected response status for reverse pair: ${reverseData.status}`);
+            throw new Error(`Unexpected response status for reverse pair: ${reverseData.status}`);
+          }
+                 } catch {
+           // Both original and reverse pairs failed
+           console.error(`❌ Both original pair ${inputTokenName}/${outputTokenName} and reverse pair ${outputTokenName}/${inputTokenName} failed`);
+           throw new Error(`Both pairs failed: ${originalError instanceof Error ? originalError.message : 'Unknown error'}`);
+         }
       }
     } catch (error) {
       console.error(`❌ Error fetching price data:`, error);
@@ -206,7 +272,7 @@ class PriceService {
    * Process pending price jobs and update them
    * NOTE: Job status checking is not available, so this function is limited
    */
-  async processPendingJobs(pendingTransactions: any[]): Promise<number> {
+  async processPendingJobs(pendingTransactions: Transaction[]): Promise<number> {
     console.log(`⚠️ Job status checking not available - cannot process pending jobs`);
     console.log(`📊 Found ${pendingTransactions.length} pending transactions that cannot be updated`);
     
