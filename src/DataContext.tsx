@@ -45,9 +45,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [error, setError] = useState<string>('');
   const [count, setCount] = useState<number>(0);
 
-  const loadData = async () => {
+  const loadData = async (setLoadingState: boolean = true) => {
     try {
-      setLoading(true);
+      if (setLoadingState) {
+        setLoading(true);
+      }
       setError('');
       
       // Fetch data from the API endpoint
@@ -68,7 +70,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       
       if (transactions.length === 0) {
         setError('No data found in API response');
-        setLoading(false);
+        if (setLoadingState) {
+          setLoading(false);
+        }
         return;
       }
       
@@ -86,7 +90,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       
       if (minTimestamp === Infinity || maxTimestamp === -Infinity) {
         setError('No valid timestamps found in data');
-        setLoading(false);
+        if (setLoadingState) {
+          setLoading(false);
+        }
         return;
       }
       
@@ -96,15 +102,41 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       setData(transactions);
       setDataRange({ min: minDate, max: maxDate });
       setCount(totalCount);
-      setLoading(false);
+      if (setLoadingState) {
+        setLoading(false);
+      }
     } catch (err) {
       setError(`Error loading data from API: ${err}`);
-      setLoading(false);
+      if (setLoadingState) {
+        setLoading(false);
+      }
     }
   };
 
-  const refreshData = () => {
-    loadData();
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // First, clear the cache by making a POST request
+      const clearCacheResponse = await fetch('https://mm.la-tribu.xyz/api/cache/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!clearCacheResponse.ok) {
+        console.warn(`Cache clear request failed with status: ${clearCacheResponse.status}`);
+        // Continue with data loading even if cache clear fails
+      }
+      
+      // Then load the fresh data
+      await loadData(false);
+    } catch (err) {
+      setError(`Error refreshing data: ${err}`);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
