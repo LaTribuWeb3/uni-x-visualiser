@@ -199,13 +199,13 @@ function validateTransaction(row: CsvRow, index: number): Transaction | null {
   }
 
   return {
-    decayStartTime: row.decayStartTime,
+    transactionHash: row.transactionHash.toLowerCase(), // Primary identifier
+    decayStartTime: timestamp, // Store as number timestamp
     inputTokenAddress: row.inputTokenAddress.toLowerCase(),
     inputStartAmount: row.inputStartAmount,
     outputTokenAddress: row.outputTokenAddress.toLowerCase(),
     outputTokenAmountOverride: row.outputTokenAmountOverride,
     orderHash: row.orderHash.toLowerCase(),
-    transactionHash: row.transactionHash.toLowerCase(),
   };
 }
 
@@ -237,6 +237,18 @@ async function connectToMongoDB() {
     
     db = client.db(dbName);
     transactionsCollection = db.collection<Transaction>(collectionName);
+
+    // Create unique index on transactionHash
+    console.log('🔑 Creating unique index on transactionHash...');
+    try {
+      await transactionsCollection.createIndex(
+        { transactionHash: 1 }, 
+        { unique: true, name: 'transactionHash_unique' }
+      );
+      console.log('✅ Unique index created on transactionHash');
+    } catch (indexError) {
+      console.log('ℹ️  Index already exists or error creating index:', (indexError as Error).message);
+    }
 
     console.log('✅ Connected to MongoDB successfully');
     return true;
@@ -448,12 +460,12 @@ app.get('/api/transactions/filtered', async (req, res) => {
     const query: Record<string, any> = {};
 
     if (startDate || endDate) {
-      query.decayStartTimeTimestamp = {};
+      query.decayStartTime = {};
       if (startDate) {
-        query.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+        query.decayStartTime.$gte = new Date(startDate as string).getTime() / 1000;
       }
       if (endDate) {
-        query.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+        query.decayStartTime.$lte = new Date(endDate as string).getTime() / 1000;
       }
     }
 
@@ -468,7 +480,7 @@ app.get('/api/transactions/filtered', async (req, res) => {
     const [transactions, total] = await Promise.all([
       transactionsCollection
         .find(query)
-        .sort({ decayStartTimeTimestamp: -1 })
+        .sort({ decayStartTime: -1 })
         .skip(parseInt(skip as string))
         .limit(parseInt(limit as string))
         .toArray(),
@@ -504,8 +516,8 @@ app.get('/api/transactions/date-range', async (req, res) => {
     }
 
     res.json({
-      min: new Date(minResult.decayStartTime! * 1000),
-      max: new Date(maxResult.decayStartTime! * 1000)
+      min: new Date(minResult.decayStartTime * 1000),
+      max: new Date(maxResult.decayStartTime * 1000)
     });
   } catch (error) {
     console.error('Error getting date range:', error);
@@ -548,13 +560,8 @@ app.post('/api/transactions', async (req, res) => {
       return res.status(400).json({ error: 'Invalid transactions data' });
     }
 
-    // Process transactions to add timestamps
-    const processedTransactions = transactions.map(transaction => ({
-      ...transaction,
-      decayStartTimeTimestamp: parseInt(transaction.decayStartTime)
-    }));
-
-    await transactionsCollection.insertMany(processedTransactions);
+    // Insert transactions directly (no additional processing needed)
+    await transactionsCollection.insertMany(transactions);
     
     res.json({ 
       message: `Inserted ${transactions.length} transactions successfully`,
@@ -615,11 +622,14 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    console.log(`📁 Processing uploaded file: ${req.file.originalname}`);
+    const fileSizeMB = (req.file.size / 1024 / 1024).toFixed(2);
+    console.log(`📁 Processing uploaded file: ${req.file.originalname} (${fileSizeMB}MB)`);
 
-    // Read and parse the uploaded CSV file
+    // Stage 1: Read and parse CSV
+    console.log('📄 Reading CSV file...');
     const csvContent = fs.readFileSync(req.file.path, 'utf-8');
     
+    console.log('🔍 Parsing CSV content...');
     const parseResult = Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
@@ -627,7 +637,7 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
     });
 
     if (parseResult.errors.length > 0) {
-      console.error('CSV parsing errors:', parseResult.errors);
+      console.error('❌ CSV parsing errors:', parseResult.errors);
       return res.status(400).json({ 
         error: 'CSV parsing failed', 
         details: parseResult.errors 
@@ -636,49 +646,62 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
 
     console.log(`📊 Parsed ${parseResult.data.length} rows from CSV`);
 
-    // Validate and transform data
+    // Stage 2: Validate and transform data
+    console.log('✅ Validating transactions...');
     const validTransactions: Transaction[] = [];
     let invalidCount = 0;
+    const totalRows = parseResult.data.length;
 
-    parseResult.data.forEach((row: any, index: number) => {
-      const transaction = validateTransaction(row, index);
-      if (transaction) {
-        validTransactions.push(transaction);
-      } else {
-        invalidCount++;
-      }
-    });
+    // Process in batches for better progress reporting
+    const batchSize = 1000;
+    for (let i = 0; i < totalRows; i += batchSize) {
+      const batch = parseResult.data.slice(i, i + batchSize);
+      console.log(`🔍 Validating batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (rows ${i + 1}-${Math.min(i + batchSize, totalRows)})`);
+      
+      batch.forEach((row: any, index: number) => {
+        const transaction = validateTransaction(row, i + index);
+        if (transaction) {
+          validTransactions.push(transaction);
+        } else {
+          invalidCount++;
+        }
+      });
+    }
+
+    console.log(`✅ Validation complete: ${validTransactions.length} valid, ${invalidCount} invalid`);
 
     if (validTransactions.length === 0) {
+      console.log('❌ No valid transactions found in file');
       return res.status(400).json({ error: 'No valid transactions found in file' });
     }
 
-    // Process transactions to add timestamps
-    const processedTransactions = validTransactions.map(transaction => ({
-      ...transaction,
-      decayStartTimeTimestamp: parseInt(transaction.decayStartTime)
-    }));
-
-    // Insert into database
-    await transactionsCollection.insertMany(processedTransactions);
+    // Stage 3: Insert transactions into database (no additional processing needed)
+    console.log('🗄️ Inserting transactions into database...');
+    const insertResult = await transactionsCollection.insertMany(validTransactions);
+    console.log(`✅ Successfully inserted ${insertResult.insertedCount} transactions`);
 
     // Clean up uploaded file
+    console.log('🧹 Cleaning up uploaded file...');
     fs.unlinkSync(req.file.path);
 
-    res.json({ 
+    const result = { 
       message: `Successfully imported ${validTransactions.length} transactions`,
       count: validTransactions.length,
       validCount: validTransactions.length,
       invalidCount: invalidCount,
       totalRows: parseResult.data.length
-    });
+    };
+
+    console.log('🎉 Upload processing complete:', result);
+    res.json(result);
 
   } catch (error) {
-    console.error('Error processing uploaded file:', error);
+    console.error('❌ Error processing uploaded file:', error);
     
     // Clean up uploaded file on error
     if (req.file) {
       try {
+        console.log('🧹 Cleaning up file after error...');
         fs.unlinkSync(req.file.path);
       } catch (cleanupError) {
         console.error('Error cleaning up file:', cleanupError);
@@ -774,7 +797,7 @@ app.get('/api/transactions/statistics', async (req, res) => {
     
     // Build date filter
     interface DateFilter {
-      decayStartTimeTimestamp?: {
+      decayStartTime?: {
         $gte?: number;
         $lte?: number;
       };
@@ -782,12 +805,12 @@ app.get('/api/transactions/statistics', async (req, res) => {
     
     const dateFilter: DateFilter = {};
     if (startDate || endDate) {
-      dateFilter.decayStartTimeTimestamp = {};
+      dateFilter.decayStartTime = {};
       if (startDate) {
-        dateFilter.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+        dateFilter.decayStartTime.$gte = new Date(startDate as string).getTime() / 1000;
       }
       if (endDate) {
-        dateFilter.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+        dateFilter.decayStartTime.$lte = new Date(endDate as string).getTime() / 1000;
       }
     }
 
@@ -875,7 +898,7 @@ app.get('/api/transactions/display', async (req, res) => {
       endDate,
       inputTokenAddress,
       outputTokenAddress,
-      sortBy = 'decayStartTimeTimestamp',
+      sortBy = 'decayStartTime',
       sortOrder = 'desc'
     } = req.query;
 
@@ -883,12 +906,12 @@ app.get('/api/transactions/display', async (req, res) => {
     const query: Record<string, any> = {};
 
     if (startDate || endDate) {
-      query.decayStartTimeTimestamp = {};
+      query.decayStartTime = {};
       if (startDate) {
-        query.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+        query.decayStartTime.$gte = new Date(startDate as string).getTime() / 1000;
       }
       if (endDate) {
-        query.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+        query.decayStartTime.$lte = new Date(endDate as string).getTime() / 1000;
       }
     }
 
@@ -947,12 +970,12 @@ app.get('/api/transactions/pairs', async (req, res) => {
     // Build date filter
     const dateFilter: Record<string, any> = {};
     if (startDate || endDate) {
-      dateFilter.decayStartTimeTimestamp = {};
+      dateFilter.decayStartTime = {};
       if (startDate) {
-        dateFilter.decayStartTimeTimestamp.$gte = new Date(startDate as string).getTime() / 1000;
+        dateFilter.decayStartTime.$gte = new Date(startDate as string).getTime() / 1000;
       }
       if (endDate) {
-        dateFilter.decayStartTimeTimestamp.$lte = new Date(endDate as string).getTime() / 1000;
+        dateFilter.decayStartTime.$lte = new Date(endDate as string).getTime() / 1000;
       }
     }
 

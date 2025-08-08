@@ -11,9 +11,6 @@
     "start-ui": "vite",
     "start-backend": "npx tsx src/backend.ts",
     "start-daemon": "npx tsx src/scripts/priceEnrichmentDaemon.ts",
-    "import-csv": "tsx src/scripts/importCsv.ts",
-    "import-csv:clear": "tsx src/scripts/importCsv.ts -- --clear",
-    "import-csv:help": "tsx src/scripts/importCsv.ts -- --help",
     "test-swagger": "node src/test-swagger.js",
     "test-simplified-daemon": "npx tsx src/scripts/testSimplifiedDaemon.ts"
   },

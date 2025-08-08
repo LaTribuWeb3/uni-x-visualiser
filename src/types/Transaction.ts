@@ -1,15 +1,15 @@
 export interface Transaction {
-  _id?: string;
-  decayStartTime: string;              // Original Unix timestamp as string
+  _id?: string;                       // MongoDB auto-generated ID (optional)
+  transactionHash: string;             // Primary identifier - Ethereum transaction hash
+  decayStartTime: number;              // Unix timestamp as number (stored only once)
   inputTokenAddress: string;           // Input token contract address
   inputStartAmount: string;            // Input token amount as string
   outputTokenAddress: string;          // Output token contract address
   outputTokenAmountOverride: string;   // Output token amount as string
   orderHash: string;                   // Unique order identifier
-  transactionHash: string;             // Ethereum transaction hash
-  openPrice: number;                  // Simplified open price
-  closePrice: number;                 // Simplified close price
-  priceStatus: 'pending' | 'completed' | 'failed'; // Status of price fetch (top level)
+  openPrice?: number;                  // Simplified open price (optional)
+  closePrice?: number;                 // Simplified close price (optional)
+  priceStatus?: 'pending' | 'completed' | 'failed'; // Status of price fetch (optional)
 }
 
 export interface TransactionFilters {
