@@ -10,6 +10,18 @@ export interface Transaction {
   openPrice?: number;                  // Simplified open price (optional)
   closePrice?: number;                 // Simplified close price (optional)
   priceStatus?: 'pending' | 'completed' | 'failed'; // Status of price fetch (optional)
+  priceData?: {                        // Detailed price data from enrichment
+    openPrice: number;
+    closePrice: number;
+    highPrice: number;
+    lowPrice: number;
+    volume: number;
+    exactMatch: boolean;
+    priceFetchedAt: Date;
+    priceJobId: string;
+    priceStatus: 'pending' | 'completed' | 'failed';
+  };
+  updatedAt?: Date;                    // Last update timestamp
 }
 
 export interface TransactionFilters {

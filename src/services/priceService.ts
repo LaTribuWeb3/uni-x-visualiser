@@ -1,5 +1,6 @@
 import { tokens } from '../assets/tokens';
 import dotenv from 'dotenv';
+import { translateTokenName } from '../utils/tokenTranslations';
 
 // Load environment variables
 dotenv.config();
@@ -48,6 +49,7 @@ class PriceService {
 
   /**
    * Convert token address to token name using the tokens.ts mapping
+   * and apply token translations (e.g., WETH -> ETH)
    */
   private getTokenName(address: string): string | null {
     // Handle zero address
@@ -57,7 +59,13 @@ class PriceService {
     
     const normalizedAddress = address.toLowerCase();
     const token = tokens.find(t => t.address.toLowerCase() === normalizedAddress);
-    return token ? token.name : null;
+    
+    if (!token) {
+      return null;
+    }
+    
+    // Apply token translations (e.g., WETH -> ETH)
+    return translateTokenName(token.name);
   }
 
   /**

@@ -101,7 +101,7 @@ class PriceEnrichmentScript {
 
     const transactions = await this.collection
       .find(query)
-      .sort({ decayStartTimeTimestamp: -1 })
+      .sort({ decayStartTime: -1 }) // Changed from decayStartTimeTimestamp to decayStartTime
       .skip(skip)
       .limit(batchSize)
       .toArray();
@@ -114,7 +114,8 @@ class PriceEnrichmentScript {
 
     for (const transaction of transactions) {
       try {
-        const timestamp = transaction.decayStartTimeTimestamp || parseInt(transaction.decayStartTime);
+        // Use decayStartTime directly since it's already stored as a number
+        const timestamp = transaction.decayStartTime;
         
         if (!timestamp) {
           console.warn(`⚠️ No valid timestamp for transaction ${transaction._id}`);
@@ -350,7 +351,7 @@ async function main() {
 }
 
 // Run the script if this file is executed directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(console.error);
 }
 
