@@ -4,8 +4,9 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
+import FileUpload from './components/FileUpload';
 import apiService from './services/api';
-import { Transaction } from './types/Transaction';
+import type { Transaction } from './types/Transaction';
 import './App.css';
 
 
@@ -43,6 +44,16 @@ const Navigation: React.FC = () => {
               }`}
             >
               Dashboard
+            </Link>
+            <Link
+              to="/upload"
+              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
+                location.pathname === '/upload'
+                  ? 'bg-gray-400 text-black border-gray-500'
+                  : 'bg-gray-200 text-black border-gray-400 hover:bg-gray-300'
+              }`}
+            >
+              Upload CSV
             </Link>
             <Link
               to="/transactions"
@@ -441,6 +452,7 @@ const App: React.FC = () => {
       <Navigation />
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/upload" element={<FileUpload />} />
         <Route path="/transactions" element={<TransactionsTable />} />
       </Routes>
     </Router>

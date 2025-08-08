@@ -3,7 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { MongoClient, Db, Collection } from 'mongodb';
 import type { Transaction } from './types/Transaction';
-import priceService from './services/priceService';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import Papa from 'papaparse';
+
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
@@ -18,6 +22,31 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'));
+    }
+  },
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 500MB limit
+  }
+});
 
 // Swagger configuration
 const swaggerOptions = {
@@ -100,6 +129,85 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Serve Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Validation function for CSV rows
+interface CsvRow {
+  decayStartTime: string;
+  inputTokenAddress: string;
+  inputStartAmount: string;
+  outputTokenAddress: string;
+  outputTokenAmountOverride: string;
+  orderHash: string;
+  transactionHash: string;
+}
+
+function validateTransaction(row: CsvRow, index: number): Transaction | null {
+  const requiredFields: (keyof CsvRow)[] = [
+    'decayStartTime',
+    'inputTokenAddress',
+    'inputStartAmount',
+    'outputTokenAddress',
+    'outputTokenAmountOverride',
+    'orderHash',
+    'transactionHash'
+  ];
+
+  // Check for missing required fields
+  for (const field of requiredFields) {
+    if (!row[field] || row[field].trim() === '') {
+      console.warn(`⚠️  Row ${index + 1}: Missing required field '${field}'`);
+      return null;
+    }
+  }
+
+  // Validate numeric fields
+  const timestamp = parseInt(row.decayStartTime);
+  if (isNaN(timestamp) || timestamp <= 0) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid timestamp '${row.decayStartTime}'`);
+    return null;
+  }
+
+  // Validate BigInt fields (amounts)
+  try {
+    BigInt(row.inputStartAmount);
+    BigInt(row.outputTokenAmountOverride);
+  } catch (error) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid amount field`);
+    return null;
+  }
+
+  // Validate addresses (basic format check)
+  if (!row.inputTokenAddress.startsWith('0x') || row.inputTokenAddress.length !== 42) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid input token address format`);
+    return null;
+  }
+
+  if (!row.outputTokenAddress.startsWith('0x') || row.outputTokenAddress.length !== 42) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid output token address format`);
+    return null;
+  }
+
+  // Validate hashes
+  if (!row.orderHash.startsWith('0x') || row.orderHash.length !== 66) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid order hash format`);
+    return null;
+  }
+
+  if (!row.transactionHash.startsWith('0x') || row.transactionHash.length !== 66) {
+    console.warn(`⚠️  Row ${index + 1}: Invalid transaction hash format`);
+    return null;
+  }
+
+  return {
+    decayStartTime: row.decayStartTime,
+    inputTokenAddress: row.inputTokenAddress.toLowerCase(),
+    inputStartAmount: row.inputStartAmount,
+    outputTokenAddress: row.outputTokenAddress.toLowerCase(),
+    outputTokenAmountOverride: row.outputTokenAmountOverride,
+    orderHash: row.orderHash.toLowerCase(),
+    transactionHash: row.transactionHash.toLowerCase(),
+  };
+}
 
 // MongoDB connection
 let client: MongoClient | null = null;
@@ -458,6 +566,129 @@ app.post('/api/transactions', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/transactions/upload:
+ *   post:
+ *     summary: Upload CSV file and import transactions
+ *     description: Upload a CSV file containing transaction data and import it into the database
+ *     tags: [Transactions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV file to upload
+ *     responses:
+ *       200:
+ *         description: File uploaded and transactions imported successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 count:
+ *                   type: number
+ *                 validCount:
+ *                   type: number
+ *                 invalidCount:
+ *                   type: number
+ *       400:
+ *         description: Invalid file or data
+ *       500:
+ *         description: Server error
+ */
+app.post('/api/transactions/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!transactionsCollection) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    console.log(`📁 Processing uploaded file: ${req.file.originalname}`);
+
+    // Read and parse the uploaded CSV file
+    const csvContent = fs.readFileSync(req.file.path, 'utf-8');
+    
+    const parseResult = Papa.parse(csvContent, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header: string) => header.trim(),
+    });
+
+    if (parseResult.errors.length > 0) {
+      console.error('CSV parsing errors:', parseResult.errors);
+      return res.status(400).json({ 
+        error: 'CSV parsing failed', 
+        details: parseResult.errors 
+      });
+    }
+
+    console.log(`📊 Parsed ${parseResult.data.length} rows from CSV`);
+
+    // Validate and transform data
+    const validTransactions: Transaction[] = [];
+    let invalidCount = 0;
+
+    parseResult.data.forEach((row: any, index: number) => {
+      const transaction = validateTransaction(row, index);
+      if (transaction) {
+        validTransactions.push(transaction);
+      } else {
+        invalidCount++;
+      }
+    });
+
+    if (validTransactions.length === 0) {
+      return res.status(400).json({ error: 'No valid transactions found in file' });
+    }
+
+    // Process transactions to add timestamps
+    const processedTransactions = validTransactions.map(transaction => ({
+      ...transaction,
+      decayStartTimeTimestamp: parseInt(transaction.decayStartTime)
+    }));
+
+    // Insert into database
+    await transactionsCollection.insertMany(processedTransactions);
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    res.json({ 
+      message: `Successfully imported ${validTransactions.length} transactions`,
+      count: validTransactions.length,
+      validCount: validTransactions.length,
+      invalidCount: invalidCount,
+      totalRows: parseResult.data.length
+    });
+
+  } catch (error) {
+    console.error('Error processing uploaded file:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    }
+    
+    res.status(500).json({ error: 'Failed to process uploaded file' });
+  }
+});
+
 // Clear all transactions
 app.delete('/api/transactions', async (req, res) => {
   try {
@@ -760,332 +991,11 @@ app.get('/api/transactions/pairs', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/transactions/enrich-prices:
- *   post:
- *     summary: Enrich transactions with price data
- *     description: Fetches and stores open/close prices for transactions using the pair pricing API
- *     tags: [Price Enrichment]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               limit:
- *                 type: number
- *                 description: Number of transactions to process
- *                 default: 100
- *                 example: 50
- *               skip:
- *                 type: number
- *                 description: Number of transactions to skip
- *                 default: 0
- *                 example: 0
- *               forceRefresh:
- *                 type: boolean
- *                 description: Force refresh even if price data already exists
- *                 default: false
- *                 example: false
- *     responses:
- *       200:
- *         description: Price enrichment completed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/EnrichmentResult'
- *       500:
- *         description: Database connection error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Database not connected"
- */
-app.post('/api/transactions/enrich-prices', async (req, res) => {
-  try {
-    if (!transactionsCollection) {
-      return res.status(500).json({ error: 'Database not connected' });
-    }
 
-    const { limit = 100, skip = 0, forceRefresh = false } = req.body;
 
-    console.log(`💰 Starting price enrichment for ${limit} transactions (skip: ${skip})`);
 
-    // Get transactions that need price data
-    const query: Record<string, any> = {};
-    if (!forceRefresh) {
-      query.$or = [
-        { priceData: { $exists: false } },
-        { 'priceData.priceStatus': { $in: ['pending', 'failed'] } }
-      ];
-    }
 
-    const transactions = await transactionsCollection
-      .find(query)
-      .sort({ decayStartTimeTimestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
 
-    console.log(`📊 Found ${transactions.length} transactions to enrich`);
-
-    let enrichedCount = 0;
-    let pendingCount = 0;
-    let failedCount = 0;
-
-    for (const transaction of transactions) {
-      try {
-        const timestamp = transaction.decayStartTimeTimestamp || parseInt(transaction.decayStartTime);
-        
-        if (!timestamp) {
-          console.warn(`⚠️ No valid timestamp for transaction ${transaction._id}`);
-          continue;
-        }
-
-        const priceData = await priceService.fetchPriceData(
-          transaction.inputTokenAddress,
-          transaction.outputTokenAddress,
-          timestamp
-        );
-
-        if (priceData) {
-          // Update the transaction with price data
-          await transactionsCollection.updateOne(
-            { _id: transaction._id },
-            { 
-              $set: { 
-                priceData,
-                updatedAt: new Date()
-              }
-            }
-          );
-
-          if (priceData.priceStatus === 'completed') {
-            enrichedCount++;
-            console.log(`✅ Enriched transaction ${transaction._id} with price data`);
-          } else if (priceData.priceStatus === 'pending') {
-            pendingCount++;
-            console.log(`⏳ Transaction ${transaction._id} price data pending`);
-          } else {
-            failedCount++;
-            console.log(`❌ Failed to get price data for transaction ${transaction._id}`);
-          }
-        } else {
-          failedCount++;
-          console.log(`❌ No price data available for transaction ${transaction._id}`);
-        }
-
-        // Add a small delay to avoid overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error(`❌ Error enriching transaction ${transaction._id}:`, error);
-        failedCount++;
-      }
-    }
-
-    const result = {
-      message: `Price enrichment completed`,
-      processed: transactions.length,
-      enriched: enrichedCount,
-      pending: pendingCount,
-      failed: failedCount
-    };
-
-    console.log(`✅ Price enrichment summary:`, result);
-    res.json(result);
-  } catch (error) {
-    console.error('Error enriching prices:', error);
-    res.status(500).json({ error: 'Failed to enrich prices' });
-  }
-});
-
-/**
- * @swagger
- * /api/transactions/process-pending-prices:
- *   post:
- *     summary: Process pending price jobs
- *     description: Checks the status of pending price jobs and updates them with completed data
- *     tags: [Price Enrichment]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               limit:
- *                 type: number
- *                 description: Number of pending jobs to process
- *                 default: 100
- *                 example: 50
- *     responses:
- *       200:
- *         description: Pending jobs processed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PendingJobsResult'
- *       500:
- *         description: Database connection error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Database not connected"
- */
-app.post('/api/transactions/process-pending-prices', async (req, res) => {
-  try {
-    if (!transactionsCollection) {
-      return res.status(500).json({ error: 'Database not connected' });
-    }
-
-    const { limit = 100 } = req.body;
-
-    console.log(`🔄 Processing pending price jobs (limit: ${limit})`);
-
-    // Get transactions with pending price data
-    const pendingTransactions = await transactionsCollection
-      .find({ 'priceData.priceStatus': 'pending' })
-      .limit(limit)
-      .toArray();
-
-    console.log(`📊 Found ${pendingTransactions.length} pending transactions`);
-
-    let completedCount = 0;
-    let stillPendingCount = 0;
-    let failedCount = 0;
-
-    for (const transaction of pendingTransactions) {
-      try {
-        if (transaction.priceData?.priceJobId) {
-          const updatedPriceData = await priceService.checkJobStatus(transaction.priceData.priceJobId);
-          
-          if (updatedPriceData) {
-            // Update the transaction with new price data
-            await transactionsCollection.updateOne(
-              { _id: transaction._id },
-              { 
-                $set: { 
-                  priceData: updatedPriceData,
-                  updatedAt: new Date()
-                }
-              }
-            );
-
-            if (updatedPriceData.priceStatus === 'completed') {
-              completedCount++;
-              console.log(`✅ Job completed for transaction ${transaction._id}`);
-            } else if (updatedPriceData.priceStatus === 'pending') {
-              stillPendingCount++;
-              console.log(`⏳ Job still pending for transaction ${transaction._id}`);
-            } else {
-              failedCount++;
-              console.log(`❌ Job failed for transaction ${transaction._id}`);
-            }
-          } else {
-            failedCount++;
-            console.log(`❌ Could not check job status for transaction ${transaction._id}`);
-          }
-        }
-
-        // Add a small delay to avoid overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error(`❌ Error processing pending job for transaction ${transaction._id}:`, error);
-        failedCount++;
-      }
-    }
-
-    const result = {
-      message: `Pending price jobs processed`,
-      processed: pendingTransactions.length,
-      completed: completedCount,
-      stillPending: stillPendingCount,
-      failed: failedCount
-    };
-
-    console.log(`✅ Pending jobs summary:`, result);
-    res.json(result);
-  } catch (error) {
-    console.error('Error processing pending prices:', error);
-    res.status(500).json({ error: 'Failed to process pending prices' });
-  }
-});
-
-/**
- * @swagger
- * /api/transactions/price-status:
- *   get:
- *     summary: Get price enrichment status
- *     description: Returns statistics about the price enrichment process
- *     tags: [Price Enrichment]
- *     responses:
- *       200:
- *         description: Price enrichment status
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PriceStatus'
- *       500:
- *         description: Database connection error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Database not connected"
- */
-app.get('/api/transactions/price-status', async (req, res) => {
-  try {
-    if (!transactionsCollection) {
-      return res.status(500).json({ error: 'Database not connected' });
-    }
-
-    const [
-      totalCount,
-      enrichedCount,
-      pendingCount,
-      failedCount,
-      noPriceCount
-    ] = await Promise.all([
-      transactionsCollection.countDocuments({}),
-      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'completed' }),
-      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'pending' }),
-      transactionsCollection.countDocuments({ 'priceData.priceStatus': 'failed' }),
-      transactionsCollection.countDocuments({ 
-        $or: [
-          { priceData: { $exists: false } },
-          { priceData: { $eq: null } }
-        ]
-      } as any)
-    ]);
-
-    const status = {
-      total: totalCount,
-      enriched: enrichedCount,
-      pending: pendingCount,
-      failed: failedCount,
-      noPrice: noPriceCount,
-      enrichmentRate: totalCount > 0 ? Math.round((enrichedCount / totalCount) * 100) : 0
-    };
-
-    res.json(status);
-  } catch (error) {
-    console.error('Error getting price status:', error);
-    res.status(500).json({ error: 'Failed to get price status' });
-  }
-});
 
 // 404 handler - must be last
 app.use('*', (req, res) => {

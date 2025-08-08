@@ -1,26 +1,30 @@
-import dotenv from 'dotenv';
-import { MongoClient } from 'mongodb';
-import type { Transaction } from '../types/Transaction';
-import priceService from '../services/priceService';
-import { getConfig, validateConfig, type DaemonConfig } from '../config/daemon.config';
+import dotenv from "dotenv";
+import { MongoClient } from "mongodb";
+import type { Transaction } from "../types/Transaction";
+import priceService from "../services/priceService";
+import {
+  getConfig,
+  validateConfig,
+  type DaemonConfig,
+} from "../config/daemon.config";
 
 // Load environment variables
 dotenv.config();
 
 // Get and validate configuration
-console.log('🔧 Loading configuration...');
+console.log("🔧 Loading configuration...");
 const config: DaemonConfig = getConfig();
-console.log('✅ Configuration loaded successfully');
+console.log("✅ Configuration loaded successfully");
 
 const configErrors = validateConfig(config);
 
 if (configErrors.length > 0) {
-  console.error('❌ Configuration errors:');
-  configErrors.forEach(error => console.error(`   - ${error}`));
+  console.error("❌ Configuration errors:");
+  configErrors.forEach((error) => console.error(`   - ${error}`));
   process.exit(1);
 }
 
-console.log('✅ Configuration validation passed');
+console.log("✅ Configuration validation passed");
 
 interface EnrichmentStats {
   total: number;
@@ -43,6 +47,7 @@ interface SimplifiedTransaction {
 
 class PriceEnrichmentDaemon {
   private client: MongoClient | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private collection: any = null;
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
@@ -50,17 +55,17 @@ class PriceEnrichmentDaemon {
 
   async connect() {
     try {
-      console.log('🔌 Connecting to MongoDB...');
+      console.log("🔌 Connecting to MongoDB...");
       this.client = new MongoClient(this.config.mongodb.uri);
       await this.client.connect();
-      
+
       const db = this.client.db(this.config.mongodb.dbName);
       this.collection = db.collection(this.config.mongodb.collectionName);
-      
-      console.log('✅ Connected to MongoDB');
+
+      console.log("✅ Connected to MongoDB");
       return true;
     } catch (error) {
-      console.error('❌ Failed to connect to MongoDB:', error);
+      console.error("❌ Failed to connect to MongoDB:", error);
       return false;
     }
   }
@@ -68,21 +73,26 @@ class PriceEnrichmentDaemon {
   async disconnect() {
     if (this.client) {
       await this.client.close();
-      console.log('🔌 Disconnected from MongoDB');
+      console.log("🔌 Disconnected from MongoDB");
     }
   }
 
   /**
    * Transform complex price data to simplified format
    */
-  private transformPriceData(complexPriceData: Record<string, unknown>): { openPrice: number; closePrice: number } | null {
+  private transformPriceData(
+    complexPriceData: Record<string, unknown>
+  ): { openPrice: number; closePrice: number } | null {
     if (!complexPriceData) return null;
 
     // Handle existing complex price data structure
-    if (typeof complexPriceData.openPrice === 'number' && typeof complexPriceData.closePrice === 'number') {
+    if (
+      typeof complexPriceData.openPrice === "number" &&
+      typeof complexPriceData.closePrice === "number"
+    ) {
       return {
         openPrice: complexPriceData.openPrice,
-        closePrice: complexPriceData.closePrice
+        closePrice: complexPriceData.closePrice,
       };
     }
 
@@ -91,7 +101,7 @@ class PriceEnrichmentDaemon {
       const result = complexPriceData.result as Record<string, unknown>;
       return {
         openPrice: (result.open as number) || 0,
-        closePrice: (result.close as number) || 0
+        closePrice: (result.close as number) || 0,
       };
     }
 
@@ -101,70 +111,54 @@ class PriceEnrichmentDaemon {
   /**
    * Transform transaction to simplified format
    */
-  private transformTransaction(transaction: Transaction): SimplifiedTransaction {
+  private transformTransaction(
+    transaction: Transaction
+  ): SimplifiedTransaction {
     const simplified: SimplifiedTransaction = {
       inputTokenAddress: transaction.inputTokenAddress,
       inputStartAmount: transaction.inputStartAmount,
       outputTokenAddress: transaction.outputTokenAddress,
       outputTokenAmountOverride: transaction.outputTokenAmountOverride,
-      openPrice: 0,
-      closePrice: 0
+      openPrice: transaction.openPrice || 0,
+      closePrice: transaction.closePrice || 0,
     };
-
-    // Transform existing price data if available
-    if (transaction.priceData) {
-      const transformedPriceData = this.transformPriceData(transaction.priceData as unknown as Record<string, unknown>);
-      if (transformedPriceData) {
-        simplified.openPrice = transformedPriceData.openPrice;
-        simplified.closePrice = transformedPriceData.closePrice;
-      }
-    }
 
     return simplified;
   }
 
-  async getTransactionsNeedingEnrichment(limit: number, skip: number = 0): Promise<Transaction[]> {
+  async getTransactionsNeedingEnrichment(): Promise<Transaction[]> {
     try {
       const query = {
         $or: [
-          { priceData: { $exists: false } },
-          { priceStatus: { $in: ['pending', 'failed'] } },
-          { 'priceData.priceStatus': { $in: ['pending', 'failed'] } },
-          // Also include transactions that have complex price data that needs transformation
-          { 
-            $and: [
-              { 'priceData.openPrice': { $exists: true } },
-              { 'priceData.closePrice': { $exists: true } },
-              { 
-                $or: [
-                  { 'priceData.highPrice': { $exists: true } },
-                  { 'priceData.lowPrice': { $exists: true } },
-                  { 'priceData.volume': { $exists: true } },
-                  { 'priceData.exactMatch': { $exists: true } },
-                  { 'priceData.priceFetchedAt': { $exists: true } },
-                  { 'priceData.priceJobId': { $exists: true } },
-                  { 'priceData.priceStatus': { $exists: true } }
-                ]
-              }
-            ]
-          }
-        ]
+          { openPrice: { $exists: false } },
+          { closePrice: { $exists: false } },
+          { priceStatus: { $in: ["pending", "failed"] } },
+          // Also include transactions that need price enrichment
+          {
+            $or: [
+              { openPrice: 0 },
+              { closePrice: 0 },
+              { openPrice: { $exists: false } },
+              { closePrice: { $exists: false } },
+            ],
+          },
+        ],
       };
 
-      const transactions = await this.collection
-        .find(query)
-        .limit(limit)
-        .skip(skip)
-        .toArray();
+      const transactions = await this.collection.find(query).toArray();
 
       return transactions;
     } catch (error) {
-      console.error('❌ Error fetching transactions:', error);
+      console.error("❌ Error fetching transactions:", error);
       return [];
     }
   }
 
-  async updateTransactionPriceData(transactionId: string, simplifiedData: SimplifiedTransaction, priceStatus?: string): Promise<boolean> {
+  async updateTransactionPriceData(
+    transactionId: string,
+    simplifiedData: SimplifiedTransaction,
+    priceStatus?: string
+  ): Promise<boolean> {
     try {
       // Get the current document to preserve essential fields
       const currentDoc = await this.collection.findOne({ _id: transactionId });
@@ -187,9 +181,9 @@ class PriceEnrichmentDaemon {
         openPrice: simplifiedData.openPrice,
         closePrice: simplifiedData.closePrice,
         // Top-level price status
-        priceStatus: priceStatus || simplifiedData.priceStatus || 'pending',
+        priceStatus: priceStatus || simplifiedData.priceStatus || "pending",
         // Update timestamp
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       // Completely replace the document with the clean structure
@@ -211,47 +205,37 @@ class PriceEnrichmentDaemon {
       enriched: 0,
       pending: 0,
       failed: 0,
-      skipped: 0
+      skipped: 0,
     };
 
-    console.log(`\n🔄 Processing batch of ${transactions.length} transactions...`);
+    console.log(
+      `\n🔄 Processing batch of ${transactions.length} transactions...`
+    );
 
     for (const transaction of transactions) {
       try {
-        // Check if transaction already has simplified price data
-        const hasSimplifiedData = transaction.openPrice !== undefined && 
-                                 transaction.closePrice !== undefined &&
-                                 transaction.priceData === undefined;
+        // Check if transaction already has valid price data
+        const hasValidPriceData =
+          transaction.openPrice !== undefined &&
+          transaction.closePrice !== undefined &&
+          transaction.openPrice > 0 &&
+          transaction.closePrice > 0 &&
+          transaction.priceStatus === "completed";
 
-        if (hasSimplifiedData) {
+        if (hasValidPriceData) {
           stats.skipped++;
-          console.log(`⏭️ Transaction ${transaction._id} already has simplified format`);
+          console.log(
+            `⏭️ Transaction ${transaction._id} already has valid price data`
+          );
           continue;
-        }
-
-        // Transform existing complex data if available
-        if (transaction.priceData) {
-          const transformedData = this.transformPriceData(transaction.priceData as unknown as Record<string, unknown>);
-          if (transformedData) {
-            const simplifiedTransaction = this.transformTransaction(transaction);
-            const priceStatus = transaction.priceData?.priceStatus;
-            const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction, priceStatus);
-            
-            if (updated) {
-              stats.enriched++;
-              console.log(`✅ Transformed existing price data for transaction ${transaction._id}`);
-            } else {
-              stats.failed++;
-              console.log(`❌ Failed to transform existing data for transaction ${transaction._id}`);
-            }
-            continue;
-          }
         }
 
         // Parse timestamp for new price data
         const timestamp = parseInt(transaction.decayStartTime);
         if (isNaN(timestamp)) {
-          console.warn(`⚠️ Invalid timestamp for transaction ${transaction._id}`);
+          console.warn(
+            `⚠️ Invalid timestamp for transaction ${transaction._id}`
+          );
           stats.failed++;
           continue;
         }
@@ -263,38 +247,52 @@ class PriceEnrichmentDaemon {
           timestamp
         );
 
-        if (priceData && priceData.priceStatus === 'completed') {
+        if (priceData && priceData.priceStatus === "completed") {
           // Transform to simplified format
           const simplifiedTransaction = this.transformTransaction(transaction);
-          const transformedPriceData = this.transformPriceData(priceData as unknown as Record<string, unknown>);
-          
+          const transformedPriceData = this.transformPriceData(
+            priceData as unknown as Record<string, unknown>
+          );
+
           if (transformedPriceData) {
             simplifiedTransaction.openPrice = transformedPriceData.openPrice;
             simplifiedTransaction.closePrice = transformedPriceData.closePrice;
           }
 
-          const updated = await this.updateTransactionPriceData(transaction._id!, simplifiedTransaction, priceData.priceStatus);
-          
+          const updated = await this.updateTransactionPriceData(
+            transaction._id!,
+            simplifiedTransaction,
+            priceData.priceStatus
+          );
+
           if (updated) {
             stats.enriched++;
-            console.log(`✅ Enriched transaction ${transaction._id} with simplified price data`);
+            console.log(
+              `✅ Enriched transaction ${transaction._id} with simplified price data`
+            );
           } else {
             stats.failed++;
             console.log(`❌ Failed to update transaction ${transaction._id}`);
           }
-        } else if (priceData && priceData.priceStatus === 'pending') {
+        } else if (priceData && priceData.priceStatus === "pending") {
           stats.pending++;
           console.log(`⏳ Transaction ${transaction._id} price data pending`);
         } else {
           stats.failed++;
-          console.log(`❌ No price data available for transaction ${transaction._id}`);
+          console.log(
+            `❌ No price data available for transaction ${transaction._id}`
+          );
         }
 
         // Small delay to avoid overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, this.config.processing.delayBetweenRequests));
-
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.config.processing.delayBetweenRequests)
+        );
       } catch (error) {
-        console.error(`❌ Error processing transaction ${transaction._id}:`, error);
+        console.error(
+          `❌ Error processing transaction ${transaction._id}:`,
+          error
+        );
         stats.failed++;
       }
     }
@@ -304,46 +302,48 @@ class PriceEnrichmentDaemon {
 
   async processPendingJobs(): Promise<number> {
     try {
-      console.log('🔄 Processing pending jobs...');
-      
-      const pendingTransactions = await this.getTransactionsNeedingEnrichment(100);
-      const pendingJobs = pendingTransactions.filter(t => t.priceData?.priceStatus === 'pending');
-      
+      console.log("🔄 Processing pending jobs...");
+
+      const pendingTransactions = await this.getTransactionsNeedingEnrichment();
+      const pendingJobs = pendingTransactions.filter(
+        (t) => t.priceStatus === "pending"
+      );
+
       if (pendingJobs.length === 0) {
-        console.log('📊 No pending jobs to process');
+        console.log("📊 No pending jobs to process");
         return 0;
       }
 
       console.log(`📊 Found ${pendingJobs.length} pending jobs`);
-      
+
       // Try to process pending jobs (though this won't work due to missing endpoint)
       const updatedCount = await priceService.processPendingJobs(pendingJobs);
-      
+
       console.log(`✅ Processed ${updatedCount} pending jobs`);
       return updatedCount;
     } catch (error) {
-      console.error('❌ Error processing pending jobs:', error);
+      console.error("❌ Error processing pending jobs:", error);
       return 0;
     }
   }
 
   async runEnrichmentCycle(): Promise<void> {
     try {
-      console.log('\n🔄 Starting enrichment cycle...');
-      
+      console.log("\n🔄 Starting enrichment cycle...");
+
       // Get transactions that need enrichment
-      const transactions = await this.getTransactionsNeedingEnrichment(this.config.processing.batchSize);
-      
+      const transactions = await this.getTransactionsNeedingEnrichment();
+
       if (transactions.length === 0) {
-        console.log('📊 No transactions need enrichment');
+        console.log("📊 No transactions need enrichment");
         return;
       }
 
       // Process the batch
       const stats = await this.enrichBatch(transactions);
-      
+
       // Log results
-      console.log('\n📊 Enrichment cycle completed:');
+      console.log("\n📊 Enrichment cycle completed:");
       console.log(`   Total: ${stats.total}`);
       console.log(`   Enriched: ${stats.enriched}`);
       console.log(`   Pending: ${stats.pending}`);
@@ -352,57 +352,68 @@ class PriceEnrichmentDaemon {
 
       // Try to process pending jobs
       await this.processPendingJobs();
-
     } catch (error) {
-      console.error('❌ Error in enrichment cycle:', error);
+      console.error("❌ Error in enrichment cycle:", error);
     }
   }
 
-  start(): void {
+  async start(): Promise<void> {
     if (this.isRunning) {
-      console.log('⚠️ Daemon is already running');
+      console.log("⚠️ Daemon is already running");
       return;
     }
 
-    console.log('🚀 Starting Price Enrichment Daemon...');
+    console.log("🚀 Starting Price Enrichment Daemon...");
     console.log(`📊 Configuration:`);
     console.log(`   Batch Size: ${this.config.processing.batchSize}`);
-    console.log(`   Interval: ${this.config.processing.intervalMs / 1000} seconds`);
+    console.log(
+      `   Interval: ${this.config.processing.intervalMs / 1000} seconds`
+    );
     console.log(`   Max Retries: ${this.config.processing.maxRetries}`);
-    console.log(`   Request Delay: ${this.config.processing.delayBetweenRequests}ms`);
-    console.log(`   Data Format: Simplified (inputTokenAddress, inputStartAmount, outputTokenAddress, outputTokenAmountOverride, openPrice, closePrice)`);
-  
+    console.log(
+      `   Request Delay: ${this.config.processing.delayBetweenRequests}ms`
+    );
+    console.log(
+      `   Data Format: Simplified (inputTokenAddress, inputStartAmount, outputTokenAddress, outputTokenAmountOverride, openPrice, closePrice)`
+    );
+
     this.isRunning = true;
 
-    // Run initial cycle
-    this.runEnrichmentCycle();
+    // Run initial cycle immediately and wait for it to complete
+    console.log("🔄 Running initial enrichment cycle...");
+    await this.runEnrichmentCycle();
+    console.log("✅ Initial cycle completed");
 
-    // Set up periodic execution
+    // Set up periodic execution starting after the interval
     this.intervalId = setInterval(async () => {
       if (this.isRunning) {
         await this.runEnrichmentCycle();
       }
     }, this.config.processing.intervalMs);
 
-    console.log('✅ Daemon started successfully');
+    console.log(
+      `✅ Daemon started successfully. Next cycle in ${
+        this.config.processing.intervalMs / 1000
+      } seconds.`
+    );
   }
 
   stop(): void {
     if (!this.isRunning) {
-      console.log('⚠️ Daemon is not running');
+      console.log("⚠️ Daemon is not running");
       return;
     }
 
-    console.log('🛑 Stopping Price Enrichment Daemon...');
-    
+    console.log("🛑 Stopping Price Enrichment Daemon...");
+
     this.isRunning = false;
-    
+
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
 
-    console.log('✅ Daemon stopped');
+    console.log("✅ Daemon stopped");
   }
 
   async run(): Promise<void> {
@@ -410,33 +421,32 @@ class PriceEnrichmentDaemon {
       // Connect to database
       const connected = await this.connect();
       if (!connected) {
-        console.error('❌ Failed to connect to database');
+        console.error("❌ Failed to connect to database");
         process.exit(1);
       }
 
       // Start the daemon
-      this.start();
+      await this.start();
 
       // Handle graceful shutdown
-      process.on('SIGINT', async () => {
-        console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+      process.on("SIGINT", async () => {
+        console.log("\n🛑 Received SIGINT, shutting down gracefully...");
         this.stop();
         await this.disconnect();
         process.exit(0);
       });
 
-      process.on('SIGTERM', async () => {
-        console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+      process.on("SIGTERM", async () => {
+        console.log("\n🛑 Received SIGTERM, shutting down gracefully...");
         this.stop();
         await this.disconnect();
         process.exit(0);
       });
 
       // Keep the process alive
-      console.log('💤 Daemon is running. Press Ctrl+C to stop.');
-      
+      console.log("💤 Daemon is running. Press Ctrl+C to stop.");
     } catch (error) {
-      console.error('❌ Fatal error in daemon:', error);
+      console.error("❌ Fatal error in daemon:", error);
       await this.disconnect();
       process.exit(1);
     }
@@ -444,11 +454,11 @@ class PriceEnrichmentDaemon {
 }
 
 // Run the daemon if this file is executed directly
-console.log('🚀 Initializing Price Enrichment Daemon...');
+console.log("🚀 Initializing Price Enrichment Daemon...");
 const daemon = new PriceEnrichmentDaemon();
-daemon.run().catch(error => {
-  console.error('❌ Failed to start daemon:', error);
+daemon.run().catch((error) => {
+  console.error("❌ Failed to start daemon:", error);
   process.exit(1);
 });
 
-export default PriceEnrichmentDaemon; 
+export default PriceEnrichmentDaemon;

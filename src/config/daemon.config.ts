@@ -39,8 +39,8 @@ export const defaultConfig: DaemonConfig = {
   },
   
   processing: {
-    batchSize: parseInt(process.env.DAEMON_BATCH_SIZE || '25'),
-    intervalMs: parseInt(process.env.DAEMON_INTERVAL_MS || '30000'), // 30 seconds
+    batchSize: parseInt(process.env.DAEMON_BATCH_SIZE || '1000'), // Increased batch size for full collection processing
+    intervalMs: parseInt(process.env.DAEMON_INTERVAL_MS || '300000'), // 5 minutes (300,000 ms)
     maxRetries: parseInt(process.env.DAEMON_MAX_RETRIES || '3'),
     retryDelayMs: parseInt(process.env.DAEMON_RETRY_DELAY_MS || '5000'), // 5 seconds
     delayBetweenRequests: parseInt(process.env.DAEMON_REQUEST_DELAY || '100'), // 100ms

@@ -249,6 +249,37 @@ class ApiService {
   }> {
     return this.fetchWithErrorHandling(`${API_BASE_URL}/transactions/price-status`);
   }
+
+  async uploadCsvFile(file: File): Promise<{
+    message: string;
+    count: number;
+    validCount: number;
+    invalidCount: number;
+    totalRows: number;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/transactions/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('File upload failed:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to upload file');
+    }
+  }
 }
 
 export const apiService = new ApiService();

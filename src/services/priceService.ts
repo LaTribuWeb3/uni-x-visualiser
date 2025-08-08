@@ -61,6 +61,52 @@ class PriceService {
   }
 
   /**
+   * Sleep for a specified number of milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Fetch price data with retry logic for 503 errors
+   */
+  private async fetchWithRetry(
+    url: string, 
+    options: RequestInit, 
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<Response> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+        
+        // If it's a 503 error and we haven't exceeded max retries, retry with exponential backoff
+        if (response.status === 503 && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 1s, 2s, 4s
+          console.log(`🔄 Received 503 error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+          await this.sleep(delay);
+          continue;
+        }
+        
+        return response;
+      } catch (error) {
+        // If it's the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // For network errors, retry with exponential backoff
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`🔄 Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+        await this.sleep(delay);
+      }
+    }
+    
+    // This should never be reached, but TypeScript requires it
+    throw new Error('Max retries exceeded');
+  }
+
+  /**
    * Fetch price data for a token pair at a specific timestamp
    */
   async fetchPriceData(
@@ -81,7 +127,7 @@ class PriceService {
       
       console.log(`🔍 Fetching price for ${inputTokenName}/${outputTokenName} at ${timestamp}`);
 
-      const response = await fetch(url, {
+      const response = await this.fetchWithRetry(url, {
         headers: {
           'Authorization': `Bearer ${this.apiToken}`,
           'Content-Type': 'application/json'
