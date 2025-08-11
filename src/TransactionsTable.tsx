@@ -36,6 +36,8 @@ const TransactionsTable: React.FC = () => {
   const [outputSearchValue, setOutputSearchValue] = useState<string>('');
   const [showInputSuggestions, setShowInputSuggestions] = useState<boolean>(false);
   const [showOutputSuggestions, setShowOutputSuggestions] = useState<boolean>(false);
+  const [transactionHashFilter, setTransactionHashFilter] = useState<string>('');
+  const [orderHashFilter, setOrderHashFilter] = useState<string>('');
 
   // Initialize date range when data is loaded
   useEffect(() => {
@@ -154,6 +156,20 @@ const TransactionsTable: React.FC = () => {
         );
       }
       
+      // Apply transaction hash filter if provided
+      if (transactionHashFilter.trim()) {
+        filtered = filtered.filter(transaction => 
+          transaction.transactionHash.toLowerCase().includes(transactionHashFilter.toLowerCase())
+        );
+      }
+      
+      // Apply order hash filter if provided
+      if (orderHashFilter.trim()) {
+        filtered = filtered.filter(transaction => 
+          transaction.orderHash.toLowerCase().includes(orderHashFilter.toLowerCase())
+        );
+      }
+      
       setFilteredData(filtered);
       setCurrentPage(1);
       return;
@@ -180,10 +196,24 @@ const TransactionsTable: React.FC = () => {
         transaction.outputTokenAddress === selectedOutputToken
       );
     }
+    
+    // Apply transaction hash filter if provided
+    if (transactionHashFilter.trim()) {
+      filtered = filtered.filter(transaction => 
+        transaction.transactionHash.toLowerCase().includes(transactionHashFilter.toLowerCase())
+      );
+    }
+    
+    // Apply order hash filter if provided
+    if (orderHashFilter.trim()) {
+      filtered = filtered.filter(transaction => 
+        transaction.orderHash.toLowerCase().includes(orderHashFilter.toLowerCase())
+      );
+    }
 
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken]);
+  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken, transactionHashFilter, orderHashFilter]);
 
   // Sorting function
   const sortData = (data: Transaction[]) => {
@@ -540,9 +570,68 @@ const TransactionsTable: React.FC = () => {
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
-                Clear Filters
+                Clear Token Filters
               </button>
             </div>
+          </div>
+
+          {/* Hash Filters */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash</label>
+            <div className="flex justify-center items-center gap-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Transaction Hash</label>
+                <input
+                  type="text"
+                  value={transactionHashFilter}
+                  onChange={(e) => setTransactionHashFilter(e.target.value)}
+                  placeholder="Enter transaction hash..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[300px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Order Hash</label>
+                <input
+                  type="text"
+                  value={orderHashFilter}
+                  onChange={(e) => setOrderHashFilter(e.target.value)}
+                  placeholder="Enter order hash..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[300px]"
+                />
+              </div>
+            </div>
+            <div className="text-center mt-2">
+              <button
+                onClick={() => {
+                  setTransactionHashFilter('');
+                  setOrderHashFilter('');
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear Hash Filters
+              </button>
+            </div>
+          </div>
+
+          {/* Clear All Filters */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => {
+                if (dataRange) {
+                  setStartDate(format(dataRange.min, 'yyyy-MM-dd'));
+                  setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
+                }
+                setSelectedInputToken('all');
+                setSelectedOutputToken('all');
+                setInputSearchValue('');
+                setOutputSearchValue('');
+                setTransactionHashFilter('');
+                setOrderHashFilter('');
+              }}
+              className="px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border border-red-300"
+            >
+              Clear All Filters
+            </button>
           </div>
         </div>
 
