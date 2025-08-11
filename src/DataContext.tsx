@@ -116,10 +116,18 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const refreshData = async () => {
     try {
+      console.log('🔄 Starting refresh operation...');
       setLoading(true);
       setError('');
       
+      // Add a timeout to prevent loading state from getting stuck
+      const timeoutId = setTimeout(() => {
+        console.warn('⚠️ Refresh operation taking longer than expected, forcing loading state reset');
+        setLoading(false);
+      }, 30000); // 30 second timeout
+      
       // First, clear the cache by making a POST request
+      console.log('🗑️ Clearing cache...');
       const clearCacheResponse = await fetch('https://mm.la-tribu.xyz/api/cache/clear', {
         method: 'POST',
         headers: {
@@ -128,13 +136,29 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       });
       
       if (!clearCacheResponse.ok) {
-        console.warn(`Cache clear request failed with status: ${clearCacheResponse.status}`);
+        console.warn(`⚠️ Cache clear request failed with status: ${clearCacheResponse.status}`);
         // Continue with data loading even if cache clear fails
+      } else {
+        console.log('✅ Cache cleared successfully');
       }
       
       // Then load the fresh data
-      await loadData(false);
+      console.log('📥 Loading fresh data...');
+      try {
+        await loadData(false);
+        clearTimeout(timeoutId); // Clear timeout on success
+        console.log('✅ Fresh data loaded successfully');
+        setLoading(false); // Ensure loading is set to false after successful refresh
+      } catch (loadError) {
+        // If loadData throws an error, we need to handle it here since setLoadingState was false
+        clearTimeout(timeoutId); // Clear timeout on error
+        console.error('❌ Error loading fresh data:', loadError);
+        setError(`Error loading fresh data: ${loadError}`);
+        setLoading(false);
+        throw loadError; // Re-throw to be caught by the outer catch block
+      }
     } catch (err) {
+      console.error('❌ Error during refresh operation:', err);
       setError(`Error refreshing data: ${err}`);
       setLoading(false);
     }
