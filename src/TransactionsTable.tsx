@@ -15,6 +15,7 @@ interface Transaction {
   transactionHash: string;
   openPrice?: string;
   closePrice?: string;
+  filler?: string;
 }
 
 interface SortConfig {
@@ -38,6 +39,7 @@ const TransactionsTable: React.FC = () => {
   const [showOutputSuggestions, setShowOutputSuggestions] = useState<boolean>(false);
   const [transactionHashFilter, setTransactionHashFilter] = useState<string>('');
   const [orderHashFilter, setOrderHashFilter] = useState<string>('');
+  const [fillerFilter, setFillerFilter] = useState<string>('');
 
   // Initialize date range when data is loaded
   useEffect(() => {
@@ -169,6 +171,13 @@ const TransactionsTable: React.FC = () => {
           transaction.orderHash.toLowerCase().includes(orderHashFilter.toLowerCase())
         );
       }
+
+      // Apply filler filter if provided
+      if (fillerFilter.trim()) {
+        filtered = filtered.filter(transaction => 
+          (transaction as any).filler && (transaction as any).filler.toLowerCase().includes(fillerFilter.toLowerCase())
+        );
+      }
       
       setFilteredData(filtered);
       setCurrentPage(1);
@@ -211,9 +220,16 @@ const TransactionsTable: React.FC = () => {
       );
     }
 
+    // Apply filler filter if provided
+    if (fillerFilter.trim()) {
+      filtered = filtered.filter(transaction => 
+        (transaction as any).filler && (transaction as any).filler.toLowerCase().includes(fillerFilter.toLowerCase())
+      );
+    }
+
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken, transactionHashFilter, orderHashFilter]);
+  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken, transactionHashFilter, orderHashFilter, fillerFilter]);
 
   // Sorting function
   const sortData = (data: Transaction[]) => {
@@ -577,7 +593,7 @@ const TransactionsTable: React.FC = () => {
 
           {/* Hash Filters */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash & Filler</label>
             <div className="flex justify-center items-center gap-4">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Transaction Hash</label>
@@ -599,16 +615,27 @@ const TransactionsTable: React.FC = () => {
                   className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[300px]"
                 />
               </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Filler</label>
+                <input
+                  type="text"
+                  value={fillerFilter}
+                  onChange={(e) => setFillerFilter(e.target.value)}
+                  placeholder="Enter filler value..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                />
+              </div>
             </div>
             <div className="text-center mt-2">
               <button
                 onClick={() => {
                   setTransactionHashFilter('');
                   setOrderHashFilter('');
+                  setFillerFilter('');
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
-                Clear Hash Filters
+                Clear Hash & Filler Filters
               </button>
             </div>
           </div>
@@ -627,6 +654,7 @@ const TransactionsTable: React.FC = () => {
                 setOutputSearchValue('');
                 setTransactionHashFilter('');
                 setOrderHashFilter('');
+                setFillerFilter('');
               }}
               className="px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border border-red-300"
             >
@@ -686,17 +714,26 @@ const TransactionsTable: React.FC = () => {
                       <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Open Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Close Price
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('filler')}
+                  >
+                    Filler
+                    {sortConfig.key === 'filler' && (
+                      <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Order Hash
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Transaction Hash
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Open Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Close Price
                   </th>
                 </tr>
               </thead>
@@ -756,19 +793,18 @@ const TransactionsTable: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {transaction.openPrice ? (
-                          <span className="font-semibold text-green-600">
-                            ${parseFloat(transaction.openPrice).toFixed(6)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">N/A</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {transaction.closePrice ? (
-                          <span className="font-semibold text-blue-600">
-                            ${parseFloat(transaction.closePrice).toFixed(6)}
-                          </span>
+                        {(transaction as any).filler ? (
+                          <button
+                            onClick={() => (transaction as any).filler && copyToClipboard((transaction as any).filler)}
+                            className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
+                            title="Click to copy full filler value"
+                          >
+                            <span className="font-medium text-gray-900">
+                              {(transaction as any).filler.length > 20 
+                                ? `${(transaction as any).filler.substring(0, 20)}...` 
+                                : (transaction as any).filler}
+                            </span>
+                          </button>
                         ) : (
                           <span className="text-gray-400 italic">N/A</span>
                         )}
@@ -792,6 +828,24 @@ const TransactionsTable: React.FC = () => {
                         >
                           {transaction.transactionHash.substring(0, 10)}...
                         </a>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {transaction.openPrice ? (
+                          <span className="font-semibold text-green-600">
+                            ${parseFloat(transaction.openPrice).toFixed(6)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">N/A</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {transaction.closePrice ? (
+                          <span className="font-semibold text-blue-600">
+                            ${parseFloat(transaction.closePrice).toFixed(6)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">N/A</span>
+                        )}
                       </td>
                     </tr>
                   );
