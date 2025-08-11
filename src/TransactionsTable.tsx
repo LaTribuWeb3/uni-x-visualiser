@@ -781,7 +781,23 @@ const TransactionsTable: React.FC = () => {
                   return (
                     <tr key={`${transaction.orderHash}-${index}`} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {format(transactionDate, 'MMM dd, yyyy HH:mm:ss')}
+                        {(() => {
+                          const now = new Date();
+                          const diffInMinutes = Math.floor((now.getTime() - transactionDate.getTime()) / (1000 * 60));
+                          
+                          if (diffInMinutes < 60) {
+                            return (
+                              <span 
+                                className="text-blue-600 font-medium cursor-help" 
+                                title={format(transactionDate, 'MMM dd, yyyy HH:mm:ss')}
+                              >
+                                {diffInMinutes === 0 ? 'Just now' : `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`}
+                              </span>
+                            );
+                          } else {
+                            return format(transactionDate, 'MMM dd, yyyy HH:mm:ss');
+                          }
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <div className="font-semibold">{getTokenName(transaction.inputTokenAddress)}</div>
