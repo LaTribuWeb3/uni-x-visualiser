@@ -13,6 +13,7 @@ interface Transaction {
   transactionHash: string;
   openPrice?: string;
   closePrice?: string;
+  quoteId?: string;
 }
 
 interface DataContextType {
