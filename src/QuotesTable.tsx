@@ -380,7 +380,7 @@ const QuotesTable: React.FC = () => {
               className={`px-6 py-3 rounded-md font-medium transition-colors border ${
                 loading
                   ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                  : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
+                  : 'bg-blue-500 text-black border-blue-600 hover:bg-blue-600'
               }`}
               title="Fetch new data from API with current filters"
             >
