@@ -39,7 +39,7 @@ interface PairStats {
 // Navigation component
 const Navigation: React.FC = () => {
   const location = useLocation();
-  const { refreshData, loading, count } = useData();
+  const { count } = useData();
   
   return (
     <nav className="bg-white shadow-md mb-6">
@@ -74,6 +74,7 @@ const Navigation: React.FC = () => {
             >
               Transactions Table
             </Link>
+            <div className="w-px h-8 bg-gray-300"></div>
             <Link
               to="/quotes"
               className={`px-4 py-2 rounded-md font-medium transition-colors border ${
@@ -84,19 +85,6 @@ const Navigation: React.FC = () => {
             >
               Quotes
             </Link>
-
-            <button
-              onClick={refreshData}
-              disabled={loading}
-              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
-                loading
-                  ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                  : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
-              }`}
-              title="Refresh data from API"
-            >
-              {loading ? 'Refreshing...' : '🔄 Refresh'}
-            </button>
           </div>
         </div>
       </div>

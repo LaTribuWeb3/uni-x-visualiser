@@ -25,7 +25,7 @@ interface SortConfig {
 }
 
 const TransactionsTable: React.FC = () => {
-  const { data, dataRange, loading, error } = useData();
+  const { data, dataRange, loading, error, refreshData } = useData();
   const [filteredData, setFilteredData] = useState<Transaction[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -980,6 +980,22 @@ const TransactionsTable: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Refresh Data Button */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={refreshData}
+            disabled={loading}
+            className={`px-6 py-3 rounded-md font-medium transition-colors border ${
+              loading
+                ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
+                : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
+            }`}
+            title="Refresh data from API"
+          >
+            {loading ? 'Refreshing...' : '🔄 Refresh Data from API'}
+          </button>
         </div>
       </div>
     </div>
