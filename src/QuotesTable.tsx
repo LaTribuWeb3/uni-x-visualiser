@@ -41,6 +41,7 @@ const QuotesTable: React.FC = () => {
   const [showTokenOutSuggestions, setShowTokenOutSuggestions] = useState<boolean>(false);
   const [isLoadingFullData, setIsLoadingFullData] = useState(false);
   const [hasFullData, setHasFullData] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Debounce ID filter for better performance
   useEffect(() => {
@@ -303,6 +304,17 @@ const QuotesTable: React.FC = () => {
     }
   };
 
+  // Toggle row expansion
+  const toggleRowExpansion = (requestId: string) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(requestId)) {
+      newExpandedRows.delete(requestId);
+    } else {
+      newExpandedRows.add(requestId);
+    }
+    setExpandedRows(newExpandedRows);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -498,36 +510,112 @@ const QuotesTable: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedRequests.map((request) => (
-                  <tr key={request._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(request.processedAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      <div className="font-semibold">{getTokenName(request.tokenIn)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenIn)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      <div className="font-semibold">{getTokenName(request.tokenOut)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenOut)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                        {formatAmount(request.amount, request.tokenIn, request.tokenOut)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {request.quotes.length}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                  <React.Fragment key={request._id}>
+                    <tr 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => toggleRowExpansion(request._id)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <span className="mr-2">
+                            {expandedRows.has(request._id) ? '▼' : '▶'}
+                          </span>
+                          {formatDate(request.processedAt)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <div className="font-semibold">{getTokenName(request.tokenIn)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenIn)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <div className="font-semibold">{getTokenName(request.tokenOut)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenOut)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                          {formatAmount(request.amount, request.tokenIn, request.tokenOut)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {request.quotes.length}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                         <button 
-                          onClick={() => copyToClipboard(request._id)} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(request._id);
+                          }} 
                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
                           title="Click to copy full ID"
                         >
                           {request._id.substring(0, 8)}...
                         </button>
                       </td>
-                  </tr>
+                    </tr>
+                    
+                    {/* Expanded quotes section */}
+                    {expandedRows.has(request._id) && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-900 text-sm">Quotes for this request:</h4>
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                      Processed At
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                      Amount
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                      Other Amount
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                      Quote ID
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {request.quotes.map((quote) => (
+                                    <tr key={quote._id} className="hover:bg-gray-100">
+                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                                        {formatDate(quote.processedAt)}
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                        {quote.src}
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                        <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                                          {formatAmount(quote.amount, request.tokenIn, request.tokenOut)}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                        {quote.otherAmount ? formatAmount(quote.otherAmount, request.tokenIn, request.tokenOut) : '-'}
+                                      </td>
+                                      <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyToClipboard(quote._id);
+                                          }} 
+                                          className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                                          title="Click to copy full quote ID"
+                                        >
+                                          {quote._id.substring(0, 8)}...
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
