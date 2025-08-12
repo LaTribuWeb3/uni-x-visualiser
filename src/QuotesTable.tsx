@@ -265,11 +265,11 @@ const QuotesTable: React.FC = () => {
       ? truncateAddress(isNegative ? tokenOutAddress : tokenInAddress)
       : tokenSymbol;
     
-    // Check if token is WETH or USDC to skip normalization
-    const isWETH = tokenSymbol === 'WETH' || tokenSymbol === 'USDC';
+    // Check if token has an associated address (is in our tokens list)
+    const hasAssociatedAddress = tokenSymbol !== (isNegative ? tokenOutAddress : tokenInAddress);
     
-    // Only normalize if not WETH or USDC
-    const absAmount = isWETH ? Math.abs(amount) : Math.abs(amount) / Math.pow(10, decimals);
+    // Only normalize if token has an associated address
+    const absAmount = hasAssociatedAddress ? Math.abs(amount) / Math.pow(10, decimals) : Math.abs(amount);
     
     if (absAmount >= 1e9) {
       return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
