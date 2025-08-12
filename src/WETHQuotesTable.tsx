@@ -15,7 +15,7 @@ interface QuotesResponse {
   data: Quote[];
 }
 
-const QuotesTable: React.FC = () => {
+const WETHQuotesTable: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -29,13 +29,16 @@ const QuotesTable: React.FC = () => {
   const [tokenOutSearchValue, setTokenOutSearchValue] = useState<string>('');
   const [showTokenInSuggestions, setShowTokenInSuggestions] = useState<boolean>(false);
   const [showTokenOutSuggestions, setShowTokenOutSuggestions] = useState<boolean>(false);
+  const [sortField, setSortField] = useState<string>('processedAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
 
   const loadQuotes = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const response = await fetch('https://mm.la-tribu.xyz/api/solvxQuotes');
+      const response = await fetch('https://mm.la-tribu.xyz/api/quotes/weth-usdc?size=100000');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -65,8 +68,6 @@ const QuotesTable: React.FC = () => {
     idFilter.trim() === '' || quote._id.toLowerCase().includes(idFilter.toLowerCase())
   );
 
-  console.log(filteredQuotes)
-
   // Apply token filters
   const tokenFilteredQuotes = filteredQuotes.filter(quote => {
     // Apply tokenIn filter if not "all"
@@ -82,9 +83,50 @@ const QuotesTable: React.FC = () => {
     return true;
   });
 
+  // Sort quotes based on selected field and direction
+  const sortedQuotes = [...tokenFilteredQuotes].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortField) {
+      case 'amount':
+        // Use raw amounts for sorting (no normalization)
+        const aAmount = parseFloat(a.amount.toString());
+        const bAmount = parseFloat(b.amount.toString());
+        
+        // Sort by absolute raw amounts
+        aValue = Math.abs(aAmount);
+        bValue = Math.abs(bAmount);
+        break;
+      case 'processedAt':
+        aValue = new Date(a.processedAt).getTime();
+        bValue = new Date(b.processedAt).getTime();
+        break;
+      case 'tokenIn':
+        aValue = getTokenName(a.tokenIn).toLowerCase();
+        bValue = getTokenName(b.tokenIn).toLowerCase();
+        break;
+      case 'tokenOut':
+        aValue = getTokenName(a.tokenOut).toLowerCase();
+        bValue = getTokenName(b.tokenOut).toLowerCase();
+        break;
+      default:
+        aValue = a[sortField as keyof Quote];
+        bValue = b[sortField as keyof Quote];
+    }
+
+    if (aValue < bValue) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(tokenFilteredQuotes.length / itemsPerPage);
-  const paginatedQuotes = tokenFilteredQuotes.slice(
+  const totalPages = Math.ceil(sortedQuotes.length / itemsPerPage);
+  const paginatedQuotes = sortedQuotes.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -150,7 +192,6 @@ const QuotesTable: React.FC = () => {
 
   const formatAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
     const isNegative = parseFloat(amount.toString()) < 0;
-    const decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
     const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
     
     // If we don't have a name for the token, truncate the address
@@ -162,30 +203,30 @@ const QuotesTable: React.FC = () => {
       const num = parseFloat(amount);
       if (isNaN(num)) return amount;
       
-      // Normalize by appropriate token decimals
-      const normalizedAmount = Math.abs(num) / Math.pow(10, decimals);
+      // Use raw amount without normalization
+      const rawAmount = Math.abs(num);
       
-      if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      if (rawAmount >= 1e9) {
+        return (rawAmount / 1e9).toFixed(3) + 'B ' + displayToken;
+      } else if (rawAmount >= 1e6) {
+        return (rawAmount / 1e6).toFixed(3) + 'M ' + displayToken;
+      } else if (rawAmount >= 1e3) {
+        return (rawAmount / 1e3).toFixed(3) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + displayToken;
+        return rawAmount.toFixed(3) + ' ' + displayToken;
       }
     } else {
-      // Normalize by appropriate token decimals
-      const normalizedAmount = Math.abs(amount) / Math.pow(10, decimals);
+      // Use raw amount without normalization
+      const rawAmount = Math.abs(amount);
       
-      if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      if (rawAmount >= 1e9) {
+        return (rawAmount / 1e9).toFixed(3) + 'B ' + displayToken;
+      } else if (rawAmount >= 1e6) {
+        return (rawAmount / 1e6).toFixed(3) + 'M ' + displayToken;
+      } else if (rawAmount >= 1e3) {
+        return (rawAmount / 1e3).toFixed(3) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + displayToken;
+        return rawAmount.toFixed(3) + ' ' + displayToken;
       }
     }
   };
@@ -212,10 +253,46 @@ const QuotesTable: React.FC = () => {
     }
   };
 
+  // Handle sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1); // Reset to first page when sorting
+  };
+
+  // Get sort indicator
+  const getSortIndicator = (field: string) => {
+    if (sortField !== field) return '↕️';
+    return sortDirection === 'asc' ? '↑' : '↓';
+  };
+
+  // Get exact raw amount for tooltip
+  const getExactAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
+    const isNegative = parseFloat(amount.toString()) < 0;
+    const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
+    
+    if (typeof amount === 'string') {
+      const num = parseFloat(amount);
+      if (isNaN(num)) return amount;
+      
+      // Use raw amount without normalization
+      const rawAmount = Math.abs(num);
+      return `${rawAmount.toLocaleString()} ${tokenSymbol}`;
+    } else {
+      // Use raw amount without normalization
+      const rawAmount = Math.abs(amount);
+      return `${rawAmount.toLocaleString()} ${tokenSymbol}`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl">Loading quotes...</div>
+        <div className="text-xl">Loading WETH quotes...</div>
       </div>
     );
   }
@@ -231,14 +308,14 @@ const QuotesTable: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-none mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">SolvX Quotes</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">WETH-USDC Quotes</h1>
         
         {/* Summary Info */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-semibold mb-2">Quotes Overview</h2>
             <p className="text-sm text-gray-600">
-              {tokenFilteredQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the SolvX API
+              {sortedQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the WETH-USDC API
             </p>
           </div>
           
@@ -347,6 +424,8 @@ const QuotesTable: React.FC = () => {
                 Clear token filters
               </button>
             </div>
+            
+
           </div>
         </div>
 
@@ -356,17 +435,29 @@ const QuotesTable: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Processed At
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('processedAt')}
+                  >
+                    Processed At {getSortIndicator('processedAt')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Token In
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('tokenIn')}
+                  >
+                    Token In {getSortIndicator('tokenIn')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Token Out
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('tokenOut')}
+                  >
+                    Token Out {getSortIndicator('tokenOut')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Amount
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('amount')}
+                  >
+                    Amount {getSortIndicator('amount')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     ID (click to copy)
@@ -388,7 +479,10 @@ const QuotesTable: React.FC = () => {
                       <div className="text-xs text-gray-500 font-mono">{truncateAddress(quote.tokenOut)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <span className={parseFloat(quote.amount.toString()) < 0 ? 'text-red-600' : 'text-green-600'}>
+                      <span 
+                        className={parseFloat(quote.amount.toString()) < 0 ? 'text-red-600' : 'text-green-600'}
+                        title={getExactAmount(quote.amount, quote.tokenIn, quote.tokenOut)}
+                      >
                         {formatAmount(quote.amount, quote.tokenIn, quote.tokenOut)}
                       </span>
                     </td>
@@ -431,9 +525,9 @@ const QuotesTable: React.FC = () => {
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, tokenFilteredQuotes.length)}
+                      {Math.min(currentPage * itemsPerPage, sortedQuotes.length)}
                     </span>{' '}
-                    of <span className="font-medium">{tokenFilteredQuotes.length}</span> results
+                    of <span className="font-medium">{sortedQuotes.length}</span> results
                   </p>
                 </div>
                 <div>
@@ -479,4 +573,4 @@ const QuotesTable: React.FC = () => {
   );
 };
 
-export default QuotesTable;
+export default WETHQuotesTable;
