@@ -158,34 +158,37 @@ const QuotesTable: React.FC = () => {
       ? truncateAddress(isNegative ? tokenOutAddress : tokenInAddress)
       : tokenSymbol;
     
+    // Check if token is WETH or USDC to skip normalization
+    const isWETH = tokenSymbol === 'WETH' || tokenSymbol === 'USDC';
+    
     if (typeof amount === 'string') {
       const num = parseFloat(amount);
       if (isNaN(num)) return amount;
       
-      // Normalize by appropriate token decimals
-      const normalizedAmount = Math.abs(num) / Math.pow(10, decimals);
+      // Only normalize if not WETH or USDC
+      const absAmount = isWETH ? Math.abs(num) : Math.abs(num) / Math.pow(10, decimals);
       
-      if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + displayToken;
+        return absAmount.toFixed(4) + ' ' + displayToken;
       }
     } else {
-      // Normalize by appropriate token decimals
-      const normalizedAmount = Math.abs(amount) / Math.pow(10, decimals);
+      // Only normalize if not WETH or USDC
+      const absAmount = isWETH ? Math.abs(amount) : Math.abs(amount) / Math.pow(10, decimals);
       
-      if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + displayToken;
+        return absAmount.toFixed(4) + ' ' + displayToken;
       }
     }
   };
