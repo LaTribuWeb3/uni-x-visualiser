@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTokenName, getTokenDecimals } from './utils';
+import { getTokenName, getTokenDecimals, truncateAddress } from './utils';
 
 interface Quote {
   _id: string;
@@ -56,6 +56,11 @@ const QuotesTable: React.FC = () => {
     const decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
     const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
     
+    // If we don't have a name for the token, truncate the address
+    const displayToken = tokenSymbol === tokenInAddress || tokenSymbol === tokenOutAddress 
+      ? truncateAddress(isNegative ? tokenOutAddress : tokenInAddress)
+      : tokenSymbol;
+    
     if (typeof amount === 'string') {
       const num = parseFloat(amount);
       if (isNaN(num)) return amount;
@@ -64,26 +69,26 @@ const QuotesTable: React.FC = () => {
       const normalizedAmount = Math.abs(num) / Math.pow(10, decimals);
       
       if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + tokenSymbol;
+        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
       } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + tokenSymbol;
+        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
       } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + tokenSymbol;
+        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + tokenSymbol;
+        return normalizedAmount.toFixed(4) + ' ' + displayToken;
       }
     } else {
       // Normalize by appropriate token decimals
       const normalizedAmount = Math.abs(amount) / Math.pow(10, decimals);
       
       if (normalizedAmount >= 1e9) {
-        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + tokenSymbol;
+        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + displayToken;
       } else if (normalizedAmount >= 1e6) {
-        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + tokenSymbol;
+        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + displayToken;
       } else if (normalizedAmount >= 1e3) {
-        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + tokenSymbol;
+        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + displayToken;
       } else {
-        return normalizedAmount.toFixed(4) + ' ' + tokenSymbol;
+        return normalizedAmount.toFixed(4) + ' ' + displayToken;
       }
     }
   };
@@ -172,11 +177,11 @@ const QuotesTable: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="font-semibold">{getTokenName(quote.tokenIn)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{quote.tokenIn}</div>
+                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(quote.tokenIn)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="font-semibold">{getTokenName(quote.tokenOut)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{quote.tokenOut}</div>
+                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(quote.tokenOut)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <span className={parseFloat(quote.amount.toString()) < 0 ? 'text-red-600' : 'text-green-600'}>
