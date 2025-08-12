@@ -689,7 +689,7 @@ const TransactionsTable: React.FC = () => {
                 setTransactionHashFilter('');
                 setOrderHashFilter('');
                 setFillerFilter('');
-                setQuoteIdFilter('');
+                setRequestIdFilter('');
               }}
               className="px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border border-red-300"
             >
