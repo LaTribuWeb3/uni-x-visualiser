@@ -570,44 +570,35 @@ const QuotesTable: React.FC = () => {
                                       Amount
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      Other Amount
-                                    </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                       Quote ID
                                     </th>
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                  {request.quotes.map((quote) => (
-                                    <tr key={quote._id} className="hover:bg-gray-100">
-                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                                        {formatDate(quote.processedAt)}
-                                      </td>
-                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
-                                        {quote.src}
-                                      </td>
-                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
-                                        <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                                          {formatAmount(quote.amount, request.tokenIn, request.tokenOut)}
-                                        </span>
-                                      </td>
-                                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
-                                        {quote.otherAmount ? formatAmount(quote.otherAmount, request.tokenIn, request.tokenOut) : '-'}
-                                      </td>
-                                      <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            copyToClipboard(quote._id);
-                                          }} 
-                                          className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                                          title="Click to copy full quote ID"
-                                        >
-                                          {quote._id.substring(0, 8)}...
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
+                                                                     {request.quotes.map((quote) => (
+                                     <tr key={quote._id} className="hover:bg-gray-100">
+                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                                         {formatDate(quote.processedAt)}
+                                       </td>
+                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                         <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                                           {formatAmount(quote.amount, request.tokenIn, request.tokenOut)}
+                                         </span>
+                                       </td>
+                                       <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
+                                         <button 
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             copyToClipboard(quote._id);
+                                           }} 
+                                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                                           title="Click to copy full quote ID"
+                                         >
+                                           {quote._id.substring(0, 8)}...
+                                         </button>
+                                       </td>
+                                     </tr>
+                                   ))}
                                 </tbody>
                               </table>
                             </div>
