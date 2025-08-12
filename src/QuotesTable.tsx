@@ -3,20 +3,30 @@ import { getTokenName, getTokenDecimals, truncateAddress } from './utils';
 
 interface Quote {
   _id: string;
-  amount: string | number;
   processedAt: string;
+  src: number;
+  amount: number;
+  otherAmount?: number;
+}
+
+interface Request {
+  _id: string;
+  amount: number;
+  chainId: number;
+  processedAt: string;
+  quotes: Quote[];
   tokenIn: string;
   tokenOut: string;
 }
 
-interface QuotesResponse {
+interface RequestsResponse {
   success: boolean;
   count: number;
-  data: Quote[];
+  data: Request[];
 }
 
 const QuotesTable: React.FC = () => {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [idFilter, setIdFilter] = useState<string>('');
@@ -41,7 +51,7 @@ const QuotesTable: React.FC = () => {
     return () => clearTimeout(timer);
   }, [idFilter]);
 
-  const loadQuotes = async (limit?: number) => {
+  const loadRequests = async (limit?: number) => {
     try {
       if (limit) {
         // Quick load with limited entries
@@ -64,13 +74,13 @@ const QuotesTable: React.FC = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const jsonData: QuotesResponse = await response.json();
+        const jsonData: RequestsResponse = await response.json();
         
         if (!jsonData.success) {
           throw new Error('API returned unsuccessful response');
         }
         
-        setQuotes(jsonData.data);
+        setRequests(jsonData.data);
         setLoading(false);
         
         // If this was a quick load, start loading full data in background
@@ -98,18 +108,18 @@ const QuotesTable: React.FC = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const jsonData: QuotesResponse = await response.json();
+        const jsonData: RequestsResponse = await response.json();
         
         if (!jsonData.success) {
           throw new Error('API returned unsuccessful response');
         }
         
-        setQuotes(jsonData.data);
+        setRequests(jsonData.data);
         setIsLoadingFullData(false);
         setHasFullData(true);
       }
     } catch (err) {
-      setError(`Error loading quotes: ${err}`);
+      setError(`Error loading requests: ${err}`);
       setLoading(false);
       setIsLoadingFullData(false);
     }
@@ -135,13 +145,13 @@ const QuotesTable: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const jsonData: QuotesResponse = await response.json();
+      const jsonData: RequestsResponse = await response.json();
       
       if (!jsonData.success) {
         throw new Error('API returned unsuccessful response');
       }
       
-      setQuotes(jsonData.data);
+      setRequests(jsonData.data);
       setIsLoadingFullData(false);
       setHasFullData(true);
     } catch (err) {
@@ -153,34 +163,34 @@ const QuotesTable: React.FC = () => {
 
   // Load initial data on component mount (quick load first)
   useEffect(() => {
-    loadQuotes(50); // Start with quick load of 50 entries
+    loadRequests(50); // Start with quick load of 50 entries
   }, []); // Only run once on mount
 
-  // Filter quotes based on all filters (now working locally)
-  const filteredQuotes = quotes.filter(quote => {
+  // Filter requests based on all filters (now working locally)
+  const filteredRequests = requests.filter(request => {
     // ID filter
-    if (idFilterDebounced.trim() !== '' && !quote._id.toLowerCase().includes(idFilterDebounced.toLowerCase())) {
+    if (idFilterDebounced.trim() !== '' && !request._id.toLowerCase().includes(idFilterDebounced.toLowerCase())) {
       return false;
     }
     
     // Token In filter
-    if (selectedTokenIn !== 'all' && quote.tokenIn !== selectedTokenIn) {
+    if (selectedTokenIn !== 'all' && request.tokenIn !== selectedTokenIn) {
       return false;
     }
     
     // Token Out filter
-    if (selectedTokenOut !== 'all' && quote.tokenOut !== selectedTokenOut) {
+    if (selectedTokenOut !== 'all' && request.tokenOut !== selectedTokenOut) {
       return false;
     }
     
     return true;
   });
 
-  console.log(filteredQuotes)
+  console.log(filteredRequests)
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage);
-  const paginatedQuotes = filteredQuotes.slice(
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const paginatedRequests = filteredRequests.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -195,9 +205,9 @@ const QuotesTable: React.FC = () => {
     const tokenInTokens = new Set<string>();
     const tokenOutTokens = new Set<string>();
     
-    quotes.forEach(quote => {
-      tokenInTokens.add(quote.tokenIn);
-      tokenOutTokens.add(quote.tokenOut);
+    requests.forEach(request => {
+      tokenInTokens.add(request.tokenIn);
+      tokenOutTokens.add(request.tokenOut);
     });
     
     return {
@@ -244,8 +254,8 @@ const QuotesTable: React.FC = () => {
     setShowTokenOutSuggestions(false);
   };
 
-  const formatAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
-    const isNegative = parseFloat(amount.toString()) < 0;
+  const formatAmount = (amount: number, tokenInAddress: string, tokenOutAddress: string): string => {
+    const isNegative = amount < 0;
     const decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
     const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
     
@@ -257,35 +267,17 @@ const QuotesTable: React.FC = () => {
     // Check if token is WETH or USDC to skip normalization
     const isWETH = tokenSymbol === 'WETH' || tokenSymbol === 'USDC';
     
-    if (typeof amount === 'string') {
-      const num = parseFloat(amount);
-      if (isNaN(num)) return amount;
-      
-      // Only normalize if not WETH or USDC
-      const absAmount = isWETH ? Math.abs(num) : Math.abs(num) / Math.pow(10, decimals);
-      
-      if (absAmount >= 1e9) {
-        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (absAmount >= 1e6) {
-        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (absAmount >= 1e3) {
-        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
-      } else {
-        return absAmount.toFixed(4) + ' ' + displayToken;
-      }
+    // Only normalize if not WETH or USDC
+    const absAmount = isWETH ? Math.abs(amount) : Math.abs(amount) / Math.pow(10, decimals);
+    
+    if (absAmount >= 1e9) {
+      return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+    } else if (absAmount >= 1e6) {
+      return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+    } else if (absAmount >= 1e3) {
+      return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
     } else {
-      // Only normalize if not WETH or USDC
-      const absAmount = isWETH ? Math.abs(amount) : Math.abs(amount) / Math.pow(10, decimals);
-      
-      if (absAmount >= 1e9) {
-        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
-      } else if (absAmount >= 1e6) {
-        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
-      } else if (absAmount >= 1e3) {
-        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
-      } else {
-        return absAmount.toFixed(4) + ' ' + displayToken;
-      }
+      return absAmount.toFixed(4) + ' ' + displayToken;
     }
   };
 
@@ -314,7 +306,7 @@ const QuotesTable: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl">Loading quotes...</div>
+        <div className="text-xl">Loading requests...</div>
       </div>
     );
   }
@@ -330,7 +322,7 @@ const QuotesTable: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-none mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">SolvX Quotes</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">SolvX Requests</h1>
         
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -343,7 +335,7 @@ const QuotesTable: React.FC = () => {
                 type="text"
                 value={idFilter}
                 onChange={(e) => setIdFilter(e.target.value)}
-                placeholder="Search by quote ID..."
+                placeholder="Search by request ID..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {idFilter && (
@@ -445,7 +437,7 @@ const QuotesTable: React.FC = () => {
           {/* Fetch Data Button */}
           <div className="mt-6 text-center">
             <button
-              onClick={() => loadQuotes()}
+              onClick={() => loadRequests()}
               disabled={isLoadingFullData}
               className={`px-6 py-3 rounded-md font-medium transition-colors border ${
                 isLoadingFullData
@@ -458,7 +450,7 @@ const QuotesTable: React.FC = () => {
             </button>
             <div className="text-xs text-gray-500 mt-2">
               {hasFullData ? (
-                <span className="text-green-600">✓ Full dataset loaded ({quotes.length.toLocaleString()} quotes)</span>
+                <span className="text-green-600">✓ Full dataset loaded ({requests.length.toLocaleString()} requests)</span>
               ) : isLoadingFullData ? (
                 <span className="text-blue-600">Loading full dataset in background...</span>
               ) : (
@@ -468,14 +460,14 @@ const QuotesTable: React.FC = () => {
           </div>
         </div>
 
-        {/* Quotes Table */}
+        {/* Requests Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Background Loading Indicator */}
           {isLoadingFullData && (
             <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
               <div className="flex items-center justify-center text-sm text-blue-700">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                Loading full dataset in background... ({quotes.length.toLocaleString()} quotes loaded so far)
+                Loading full dataset in background... ({requests.length.toLocaleString()} requests loaded so far)
               </div>
             </div>
           )}
@@ -497,36 +489,42 @@ const QuotesTable: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Quotes Count
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     ID (click to copy)
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedQuotes.map((quote) => (
-                  <tr key={quote._id} className="hover:bg-gray-50">
+                {paginatedRequests.map((request) => (
+                  <tr key={request._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(quote.processedAt)}
+                      {formatDate(request.processedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      <div className="font-semibold">{getTokenName(quote.tokenIn)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(quote.tokenIn)}</div>
+                      <div className="font-semibold">{getTokenName(request.tokenIn)}</div>
+                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenIn)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      <div className="font-semibold">{getTokenName(quote.tokenOut)}</div>
-                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(quote.tokenOut)}</div>
+                      <div className="font-semibold">{getTokenName(request.tokenOut)}</div>
+                      <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenOut)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <span className={parseFloat(quote.amount.toString()) < 0 ? 'text-red-600' : 'text-green-600'}>
-                        {formatAmount(quote.amount, quote.tokenIn, quote.tokenOut)}
+                      <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                        {formatAmount(request.amount, request.tokenIn, request.tokenOut)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {request.quotes.length}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                         <button 
-                          onClick={() => copyToClipboard(quote._id)} 
+                          onClick={() => copyToClipboard(request._id)} 
                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
                           title="Click to copy full ID"
                         >
-                          {quote._id.substring(0, 8)}...
+                          {request._id.substring(0, 8)}...
                         </button>
                       </td>
                   </tr>
@@ -559,9 +557,9 @@ const QuotesTable: React.FC = () => {
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, filteredQuotes.length)}
+                      {Math.min(currentPage * itemsPerPage, filteredRequests.length)}
                     </span>{' '}
-                    of <span className="font-medium">{filteredQuotes.length}</span> results
+                    of <span className="font-medium">{filteredRequests.length}</span> results
                   </p>
                 </div>
                 <div>
