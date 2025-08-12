@@ -696,6 +696,37 @@ const TransactionsTable: React.FC = () => {
               Clear All Filters
             </button>
           </div>
+
+          {/* Cache Clear Button */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('https://mm.la-tribu.xyz/api/cache/clear', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`Cache cleared successfully! ${result.message}`);
+                  } else {
+                    alert('Failed to clear cache. Please try again.');
+                  }
+                } catch (error) {
+                  console.error('Error clearing cache:', error);
+                  alert('Error clearing cache. Please check the console for details.');
+                }
+              }}
+              disabled={loading}
+              className="px-4 py-2 bg-orange-100 text-orange-700 font-semibold rounded-md hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors border border-orange-300"
+              title="Clear API cache"
+            >
+              Clear Cache
+            </button>
+          </div>
         </div>
 
         {/* Transactions Table */}
@@ -989,21 +1020,7 @@ const TransactionsTable: React.FC = () => {
           )}
         </div>
 
-        {/* Refresh Data Button */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={refreshData}
-            disabled={loading}
-            className={`px-6 py-3 rounded-md font-medium transition-colors border ${
-              loading
-                ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
-            }`}
-            title="Refresh data from API"
-          >
-            {loading ? 'Refreshing...' : '🔄 Refresh Data from API'}
-          </button>
-        </div>
+
       </div>
     </div>
   );
