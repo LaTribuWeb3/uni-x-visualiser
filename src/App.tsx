@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
+import QuotesTable from './QuotesTable';
 import { DataProvider, useData } from './DataContext';
 import './App.css';
 
@@ -71,6 +72,16 @@ const Navigation: React.FC = () => {
               }`}
             >
               Transactions Table
+            </Link>
+            <Link
+              to="/quotes"
+              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
+                location.pathname === '/quotes'
+                  ? 'bg-gray-400 text-black border-gray-500'
+                  : 'bg-gray-200 text-black border-gray-400 hover:bg-gray-300'
+              }`}
+            >
+              Quotes
             </Link>
             <button
               onClick={refreshData}
@@ -481,6 +492,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/transactions" element={<TransactionsTable />} />
+          <Route path="/quotes" element={<QuotesTable />} />
         </Routes>
       </Router>
     </DataProvider>
