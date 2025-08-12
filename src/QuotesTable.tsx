@@ -52,11 +52,13 @@ const QuotesTable: React.FC = () => {
     return () => clearTimeout(timer);
   }, [idFilter]);
 
-  const loadRequests = async (limit?: number) => {
+  const loadRequests = async (limit?: number, showFullScreenLoading: boolean = true) => {
     try {
       if (limit) {
         // Quick load with limited entries
-        setLoading(true);
+        if (showFullScreenLoading) {
+          setLoading(true);
+        }
         setError('');
         
         const params = new URLSearchParams();
@@ -164,7 +166,7 @@ const QuotesTable: React.FC = () => {
 
   // Load initial data on component mount (quick load first)
   useEffect(() => {
-    loadRequests(50); // Start with quick load of 50 entries
+    loadRequests(50, true); // Start with quick load of 50 entries, show full-screen loading
   }, []); // Only run once on mount
 
   // Filter requests based on all filters (now working locally)
@@ -247,12 +249,20 @@ const QuotesTable: React.FC = () => {
     setSelectedTokenIn(tokenAddress);
     setTokenInSearchValue(getTokenName(tokenAddress));
     setShowTokenInSuggestions(false);
+    // Reset to first page and load data with new filter
+    setCurrentPage(1);
+    setHasFullData(false);
+    loadRequests(50, false); // Start with quick load of 50 entries, no full-screen loading
   };
 
   const handleTokenOutSelect = (tokenAddress: string) => {
     setSelectedTokenOut(tokenAddress);
     setTokenOutSearchValue(getTokenName(tokenAddress));
     setShowTokenOutSuggestions(false);
+    // Reset to first page and load data with new filter
+    setCurrentPage(1);
+    setHasFullData(false);
+    loadRequests(50, false); // Start with quick load of 50 entries, no full-screen loading
   };
 
   const formatAmount = (amount: number, tokenInAddress: string, tokenOutAddress: string): string => {
