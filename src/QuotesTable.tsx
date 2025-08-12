@@ -20,6 +20,7 @@ const QuotesTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [count, setCount] = useState<number>(0);
+  const [idFilter, setIdFilter] = useState<string>('');
 
   const loadQuotes = async () => {
     try {
@@ -50,6 +51,11 @@ const QuotesTable: React.FC = () => {
   useEffect(() => {
     loadQuotes();
   }, []);
+
+  // Filter quotes based on ID filter
+  const filteredQuotes = quotes.filter(quote => 
+    idFilter.trim() === '' || quote._id.toLowerCase().includes(idFilter.toLowerCase())
+  );
 
   const formatAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
     const isNegative = parseFloat(amount.toString()) < 0;
@@ -138,11 +144,35 @@ const QuotesTable: React.FC = () => {
         
         {/* Summary Info */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="text-center">
+          <div className="text-center mb-4">
             <h2 className="text-xl font-semibold mb-2">Quotes Overview</h2>
             <p className="text-sm text-gray-600">
-              {count.toLocaleString()} quotes loaded from the SolvX API
+              {filteredQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the SolvX API
             </p>
+          </div>
+          
+          {/* ID Filter */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-md">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by ID</label>
+              <input
+                type="text"
+                value={idFilter}
+                onChange={(e) => setIdFilter(e.target.value)}
+                placeholder="Enter quote ID to filter..."
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {idFilter.trim() && (
+                <div className="text-center mt-2">
+                  <button
+                    onClick={() => setIdFilter('')}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Clear ID Filter
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -170,7 +200,7 @@ const QuotesTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {quotes.map((quote) => (
+                {filteredQuotes.map((quote) => (
                   <tr key={quote._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(quote.processedAt)}
