@@ -81,23 +81,36 @@ const QuotesTable: React.FC = () => {
     }
   };
 
+  // Load initial data on component mount
   useEffect(() => {
     loadQuotes();
-  }, [selectedTokenIn, selectedTokenOut]); // Reload when token filters change
+  }, []); // Only run once on mount
 
-  // Filter quotes based on ID filter only (since token filtering is now server-side)
-  const filteredQuotes = quotes.filter(quote => 
-    idFilterDebounced.trim() === '' || quote._id.toLowerCase().includes(idFilterDebounced.toLowerCase())
-  );
+  // Filter quotes based on all filters (now working locally)
+  const filteredQuotes = quotes.filter(quote => {
+    // ID filter
+    if (idFilterDebounced.trim() !== '' && !quote._id.toLowerCase().includes(idFilterDebounced.toLowerCase())) {
+      return false;
+    }
+    
+    // Token In filter
+    if (selectedTokenIn !== 'all' && quote.tokenIn !== selectedTokenIn) {
+      return false;
+    }
+    
+    // Token Out filter
+    if (selectedTokenOut !== 'all' && quote.tokenOut !== selectedTokenOut) {
+      return false;
+    }
+    
+    return true;
+  });
 
   console.log(filteredQuotes)
 
-  // No need for token filtering since it's now handled server-side
-  const tokenFilteredQuotes = filteredQuotes;
-
   // Pagination logic
-  const totalPages = Math.ceil(tokenFilteredQuotes.length / itemsPerPage);
-  const paginatedQuotes = tokenFilteredQuotes.slice(
+  const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage);
+  const paginatedQuotes = filteredQuotes.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -358,6 +371,25 @@ const QuotesTable: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Fetch Data Button */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={loadQuotes}
+              disabled={loading}
+              className={`px-6 py-3 rounded-md font-medium transition-colors border ${
+                loading
+                  ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
+                  : 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
+              }`}
+              title="Fetch new data from API with current filters"
+            >
+              {loading ? '🔄 Fetching...' : '🔄 Fetch Data from API'}
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+              Current filters will be applied when fetching new data
+            </p>
+          </div>
         </div>
 
         {/* Quotes Table */}
@@ -441,9 +473,9 @@ const QuotesTable: React.FC = () => {
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, tokenFilteredQuotes.length)}
+                      {Math.min(currentPage * itemsPerPage, filteredQuotes.length)}
                     </span>{' '}
-                    of <span className="font-medium">{tokenFilteredQuotes.length}</span> results
+                    of <span className="font-medium">{filteredQuotes.length}</span> results
                   </p>
                 </div>
                 <div>
