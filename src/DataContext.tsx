@@ -14,6 +14,7 @@ interface Transaction {
   openPrice?: string;
   closePrice?: string;
   quoteId?: string;
+  requestId?: string;
 }
 
 interface DataContextType {

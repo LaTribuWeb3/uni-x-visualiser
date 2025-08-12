@@ -17,6 +17,7 @@ interface Transaction {
   closePrice?: string;
   filler?: string;
   quoteId?: string;
+  requestId?: string;
 }
 
 interface SortConfig {
@@ -41,13 +42,19 @@ const TransactionsTable: React.FC = () => {
   const [transactionHashFilter, setTransactionHashFilter] = useState<string>('');
   const [orderHashFilter, setOrderHashFilter] = useState<string>('');
   const [fillerFilter, setFillerFilter] = useState<string>('');
-  const [quoteIdFilter, setQuoteIdFilter] = useState<string>('');
+  const [requestIdFilter, setRequestIdFilter] = useState<string>('');
 
   // Initialize date range when data is loaded
   useEffect(() => {
     if (dataRange && data.length > 0) {
       setStartDate(format(dataRange.min, 'yyyy-MM-dd'));
       setEndDate(format(dataRange.max, 'yyyy-MM-dd'));
+    }
+    
+    // Debug: Log the first transaction to see what fields are available
+    if (data.length > 0) {
+      console.log('First transaction fields:', Object.keys(data[0]));
+      console.log('First transaction data:', data[0]);
     }
   }, [dataRange, data]);
 
@@ -181,10 +188,10 @@ const TransactionsTable: React.FC = () => {
         );
       }
       
-      // Apply quoteId filter if provided
-      if (quoteIdFilter.trim()) {
+      // Apply requestId filter if provided
+      if (requestIdFilter.trim()) {
         filtered = filtered.filter(transaction => 
-          (transaction as any).quoteId && (transaction as any).quoteId.toLowerCase().includes(quoteIdFilter.toLowerCase())
+          transaction.requestId && transaction.requestId.toLowerCase().includes(requestIdFilter.toLowerCase())
         );
       }
       
@@ -236,16 +243,16 @@ const TransactionsTable: React.FC = () => {
       );
     }
     
-    // Apply quoteId filter if provided
-    if (quoteIdFilter.trim()) {
+    // Apply requestId filter if provided
+    if (requestIdFilter.trim()) {
       filtered = filtered.filter(transaction => 
-        (transaction as any).quoteId && (transaction as any).quoteId.toLowerCase().includes(quoteIdFilter.toLowerCase())
+        transaction.requestId && transaction.requestId.toLowerCase().includes(requestIdFilter.trim().toLowerCase())
       );
     }
 
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken, transactionHashFilter, orderHashFilter, fillerFilter, quoteIdFilter]);
+  }, [data, startDate, endDate, selectedInputToken, selectedOutputToken, transactionHashFilter, orderHashFilter, fillerFilter, requestIdFilter]);
 
   // Sorting function
   const sortData = (data: Transaction[]) => {
@@ -609,7 +616,7 @@ const TransactionsTable: React.FC = () => {
 
           {/* Hash Filters */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash, Filler & Quote ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash, Filler & Request ID</label>
             <div className="flex justify-center items-center gap-4">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Transaction Hash</label>
@@ -645,9 +652,9 @@ const TransactionsTable: React.FC = () => {
                 <label className="block text-xs text-gray-600 mb-1">Quote ID</label>
                 <input
                   type="text"
-                  value={quoteIdFilter}
-                  onChange={(e) => setQuoteIdFilter(e.target.value)}
-                  placeholder="Enter quote ID..."
+                  value={requestIdFilter}
+                  onChange={(e) => setRequestIdFilter(e.target.value)}
+                  placeholder="Enter request ID..."
                   className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
                 />
               </div>
@@ -658,7 +665,7 @@ const TransactionsTable: React.FC = () => {
                   setTransactionHashFilter('');
                   setOrderHashFilter('');
                   setFillerFilter('');
-                  setQuoteIdFilter('');
+                  setRequestIdFilter('');
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
@@ -759,10 +766,10 @@ const TransactionsTable: React.FC = () => {
                   </th>
                   <th 
                     className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('quoteId')}
+                    onClick={() => handleSort('requestId')}
                   >
-                    Quote ID
-                    {sortConfig.key === 'quoteId' && (
+                    Request ID
+                    {sortConfig.key === 'requestId' && (
                       <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
@@ -877,16 +884,16 @@ const TransactionsTable: React.FC = () => {
                         </a>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {(transaction as any).quoteId ? (
+                        {transaction.requestId ? (
                           <button
-                            onClick={() => (transaction as any).quoteId && copyToClipboard((transaction as any).quoteId)}
+                            onClick={() => transaction.requestId && copyToClipboard(transaction.requestId)}
                             className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
-                            title="Click to copy full quote ID"
+                            title="Click to copy full request ID"
                           >
                             <span className="font-medium text-gray-900">
-                              {(transaction as any).quoteId.length > 20 
-                                ? `${(transaction as any).quoteId.substring(0, 20)}...` 
-                                : (transaction as any).quoteId}
+                              {transaction.requestId.length > 20 
+                                ? `${transaction.requestId.substring(0, 20)}...` 
+                                : transaction.requestId}
                             </span>
                           </button>
                         ) : (
