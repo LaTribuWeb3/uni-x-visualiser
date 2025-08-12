@@ -649,7 +649,7 @@ const TransactionsTable: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Quote ID</label>
+                <label className="block text-xs text-gray-600 mb-1">Request ID</label>
                 <input
                   type="text"
                   value={requestIdFilter}
