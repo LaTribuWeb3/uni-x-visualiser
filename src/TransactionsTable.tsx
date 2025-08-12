@@ -609,7 +609,7 @@ const TransactionsTable: React.FC = () => {
 
           {/* Hash Filters */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash, Filler & Request ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Hash, Filler & Quote ID</label>
             <div className="flex justify-center items-center gap-4">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Transaction Hash</label>
@@ -642,12 +642,12 @@ const TransactionsTable: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Request ID</label>
+                <label className="block text-xs text-gray-600 mb-1">Quote ID</label>
                 <input
                   type="text"
                   value={quoteIdFilter}
                   onChange={(e) => setQuoteIdFilter(e.target.value)}
-                  placeholder="Enter request ID..."
+                  placeholder="Enter quote ID..."
                   className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
                 />
               </div>
@@ -761,7 +761,7 @@ const TransactionsTable: React.FC = () => {
                     className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('quoteId')}
                   >
-                    Request ID
+                    Quote ID
                     {sortConfig.key === 'quoteId' && (
                       <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                     )}
@@ -881,7 +881,7 @@ const TransactionsTable: React.FC = () => {
                           <button
                             onClick={() => (transaction as any).quoteId && copyToClipboard((transaction as any).quoteId)}
                             className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
-                            title="Click to copy full request ID"
+                            title="Click to copy full quote ID"
                           >
                             <span className="font-medium text-gray-900">
                               {(transaction as any).quoteId.length > 20 
