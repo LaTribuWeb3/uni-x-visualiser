@@ -21,6 +21,7 @@ const QuotesTable: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [count, setCount] = useState<number>(0);
   const [idFilter, setIdFilter] = useState<string>('');
+  const [idFilterDebounced, setIdFilterDebounced] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
   const [selectedTokenIn, setSelectedTokenIn] = useState<string>('all');
@@ -29,13 +30,41 @@ const QuotesTable: React.FC = () => {
   const [tokenOutSearchValue, setTokenOutSearchValue] = useState<string>('');
   const [showTokenInSuggestions, setShowTokenInSuggestions] = useState<boolean>(false);
   const [showTokenOutSuggestions, setShowTokenOutSuggestions] = useState<boolean>(false);
+  const [isFiltering, setIsFiltering] = useState<boolean>(false);
+
+  // Debounce ID filter for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIdFilterDebounced(idFilter);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [idFilter]);
 
   const loadQuotes = async () => {
     try {
       setLoading(true);
+      setIsFiltering(true);
       setError('');
       
-      const response = await fetch('https://mm.la-tribu.xyz/api/solvxQuotes');
+      // Build query parameters for the API
+      const params = new URLSearchParams();
+      
+      // Add token filters if they are selected
+      if (selectedTokenIn !== 'all') {
+        params.append('tokenIn', selectedTokenIn);
+      }
+      if (selectedTokenOut !== 'all') {
+        params.append('tokenOut', selectedTokenOut);
+      }
+      
+      // Add limit parameter for better performance
+      params.append('limit', '20000');
+      
+      // Build the URL with query parameters
+      const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -50,37 +79,27 @@ const QuotesTable: React.FC = () => {
       setQuotes(jsonData.data);
       setCount(jsonData.count || jsonData.data.length);
       setLoading(false);
+      setIsFiltering(false);
     } catch (err) {
       setError(`Error loading quotes: ${err}`);
       setLoading(false);
+      setIsFiltering(false);
     }
   };
 
   useEffect(() => {
     loadQuotes();
-  }, []);
+  }, [selectedTokenIn, selectedTokenOut]); // Reload when token filters change
 
-  // Filter quotes based on ID filter
+  // Filter quotes based on ID filter only (since token filtering is now server-side)
   const filteredQuotes = quotes.filter(quote => 
-    idFilter.trim() === '' || quote._id.toLowerCase().includes(idFilter.toLowerCase())
+    idFilterDebounced.trim() === '' || quote._id.toLowerCase().includes(idFilterDebounced.toLowerCase())
   );
 
   console.log(filteredQuotes)
 
-  // Apply token filters
-  const tokenFilteredQuotes = filteredQuotes.filter(quote => {
-    // Apply tokenIn filter if not "all"
-    if (selectedTokenIn !== 'all' && quote.tokenIn !== selectedTokenIn) {
-      return false;
-    }
-    
-    // Apply tokenOut filter if not "all"
-    if (selectedTokenOut !== 'all' && quote.tokenOut !== selectedTokenOut) {
-      return false;
-    }
-    
-    return true;
-  });
+  // No need for token filtering since it's now handled server-side
+  const tokenFilteredQuotes = filteredQuotes;
 
   // Pagination logic
   const totalPages = Math.ceil(tokenFilteredQuotes.length / itemsPerPage);
@@ -92,7 +111,7 @@ const QuotesTable: React.FC = () => {
   // Reset to first page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [idFilter, selectedTokenIn, selectedTokenOut]);
+  }, [idFilterDebounced, selectedTokenIn, selectedTokenOut]);
 
   // Get unique tokens for filtering
   const getUniqueTokens = () => {
@@ -243,8 +262,52 @@ const QuotesTable: React.FC = () => {
             <p className="text-sm text-gray-600">
               {tokenFilteredQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the SolvX API
             </p>
+            {(selectedTokenIn !== 'all' || selectedTokenOut !== 'all') && (
+              <p className="text-xs text-gray-500 mt-1">
+                Showing filtered results • Total available: {count.toLocaleString()}
+              </p>
+            )}
+            {/* Filter Status */}
+            <div className="mt-2 flex justify-center">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                {selectedTokenIn === 'all' && selectedTokenOut === 'all' ? (
+                  <>
+                    <svg className="w-3 h-3 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    All tokens
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3 mr-1 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    Filtered
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {/* Filtering Indicator */}
+            {isFiltering && (
+              <div className="mt-2 flex justify-center">
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Updating filters...
+                </div>
+              </div>
+            )}
+            {/* Pagination Info */}
+            {totalPages > 1 && (
+              <div className="mt-2 text-xs text-gray-500">
+                Page {currentPage} of {totalPages} • {itemsPerPage} items per page
+              </div>
+            )}
           </div>
-          
+            
           {/* ID Filter */}
           <div className="flex justify-center">
             <div className="w-full max-w-md">
