@@ -29,6 +29,8 @@ const QuotesTable: React.FC = () => {
   const [tokenOutSearchValue, setTokenOutSearchValue] = useState<string>('');
   const [showTokenInSuggestions, setShowTokenInSuggestions] = useState<boolean>(false);
   const [showTokenOutSuggestions, setShowTokenOutSuggestions] = useState<boolean>(false);
+  const [isLoadingFullData, setIsLoadingFullData] = useState(false);
+  const [hasFullData, setHasFullData] = useState(false);
 
   // Debounce ID filter for better performance
   useEffect(() => {
@@ -39,28 +41,94 @@ const QuotesTable: React.FC = () => {
     return () => clearTimeout(timer);
   }, [idFilter]);
 
-  const loadQuotes = async () => {
+  const loadQuotes = async (limit?: number) => {
     try {
-      setLoading(true);
-      setError('');
+      if (limit) {
+        // Quick load with limited entries
+        setLoading(true);
+        setError('');
+        
+        const params = new URLSearchParams();
+        if (selectedTokenIn !== 'all') {
+          params.append('tokenIn', selectedTokenIn);
+        }
+        if (selectedTokenOut !== 'all') {
+          params.append('tokenOut', selectedTokenOut);
+        }
+        params.append('limit', limit.toString());
+        
+        const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const jsonData: QuotesResponse = await response.json();
+        
+        if (!jsonData.success) {
+          throw new Error('API returned unsuccessful response');
+        }
+        
+        setQuotes(jsonData.data);
+        setLoading(false);
+        
+        // If this was a quick load, start loading full data in background
+        if (limit < 20000) {
+          loadFullDataInBackground();
+        }
+      } else {
+        // Full load (called by user clicking Fetch Data button)
+        setIsLoadingFullData(true);
+        setError('');
+        
+        const params = new URLSearchParams();
+        if (selectedTokenIn !== 'all') {
+          params.append('tokenIn', selectedTokenIn);
+        }
+        if (selectedTokenOut !== 'all') {
+          params.append('tokenOut', selectedTokenOut);
+        }
+        params.append('limit', '20000');
+        
+        const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const jsonData: QuotesResponse = await response.json();
+        
+        if (!jsonData.success) {
+          throw new Error('API returned unsuccessful response');
+        }
+        
+        setQuotes(jsonData.data);
+        setIsLoadingFullData(false);
+        setHasFullData(true);
+      }
+    } catch (err) {
+      setError(`Error loading quotes: ${err}`);
+      setLoading(false);
+      setIsLoadingFullData(false);
+    }
+  };
+
+  const loadFullDataInBackground = async () => {
+    try {
+      setIsLoadingFullData(true);
       
-      // Build query parameters for the API
       const params = new URLSearchParams();
-      
-      // Add token filters if they are selected
       if (selectedTokenIn !== 'all') {
         params.append('tokenIn', selectedTokenIn);
       }
       if (selectedTokenOut !== 'all') {
         params.append('tokenOut', selectedTokenOut);
       }
-      
-      // Add limit parameter for better performance
       params.append('limit', '20000');
       
-      // Build the URL with query parameters
       const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
-      
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -74,16 +142,18 @@ const QuotesTable: React.FC = () => {
       }
       
       setQuotes(jsonData.data);
-      setLoading(false);
+      setIsLoadingFullData(false);
+      setHasFullData(true);
     } catch (err) {
-      setError(`Error loading quotes: ${err}`);
-      setLoading(false);
+      console.error('Background data load failed:', err);
+      setIsLoadingFullData(false);
+      // Don't show error to user for background load
     }
   };
 
-  // Load initial data on component mount
+  // Load initial data on component mount (quick load first)
   useEffect(() => {
-    loadQuotes();
+    loadQuotes(50); // Start with quick load of 50 entries
   }, []); // Only run once on mount
 
   // Filter quotes based on all filters (now working locally)
@@ -375,25 +445,41 @@ const QuotesTable: React.FC = () => {
           {/* Fetch Data Button */}
           <div className="mt-6 text-center">
             <button
-              onClick={loadQuotes}
-              disabled={loading}
+              onClick={() => loadQuotes()}
+              disabled={isLoadingFullData}
               className={`px-6 py-3 rounded-md font-medium transition-colors border ${
-                loading
+                isLoadingFullData
                   ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
                   : 'bg-blue-500 text-black border-blue-600 hover:bg-blue-600'
               }`}
               title="Fetch new data from API with current filters"
             >
-              {loading ? '🔄 Fetching...' : '🔄 Fetch Data from API'}
+              {isLoadingFullData ? '🔄 Fetching...' : '🔄 Fetch Data from API'}
             </button>
-            <p className="text-xs text-gray-500 mt-2">
-              Current filters will be applied when fetching new data
-            </p>
+            <div className="text-xs text-gray-500 mt-2">
+              {hasFullData ? (
+                <span className="text-green-600">✓ Full dataset loaded ({quotes.length.toLocaleString()} quotes)</span>
+              ) : isLoadingFullData ? (
+                <span className="text-blue-600">Loading full dataset in background...</span>
+              ) : (
+                <span>Current filters will be applied when fetching new data</span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Quotes Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Background Loading Indicator */}
+          {isLoadingFullData && (
+            <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+              <div className="flex items-center justify-center text-sm text-blue-700">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Loading full dataset in background... ({quotes.length.toLocaleString()} quotes loaded so far)
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
