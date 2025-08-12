@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTokenName } from './utils';
+import { getTokenName, getTokenDecimals } from './utils';
 
 interface Quote {
   _id: string;
@@ -51,25 +51,40 @@ const QuotesTable: React.FC = () => {
     loadQuotes();
   }, []);
 
-  const formatAmount = (amount: string | number): string => {
+  const formatAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
+    const isNegative = parseFloat(amount.toString()) < 0;
+    const decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
+    const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
+    
     if (typeof amount === 'string') {
-      // Handle very large numbers
       const num = parseFloat(amount);
       if (isNaN(num)) return amount;
       
-      if (Math.abs(num) >= 1e18) {
-        return (num / 1e18).toFixed(2) + 'e18';
-      } else if (Math.abs(num) >= 1e9) {
-        return (num / 1e9).toFixed(2) + 'B';
-      } else if (Math.abs(num) >= 1e6) {
-        return (num / 1e6).toFixed(2) + 'M';
-      } else if (Math.abs(num) >= 1e3) {
-        return (num / 1e3).toFixed(2) + 'K';
+      // Normalize by appropriate token decimals
+      const normalizedAmount = Math.abs(num) / Math.pow(10, decimals);
+      
+      if (normalizedAmount >= 1e9) {
+        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + tokenSymbol;
+      } else if (normalizedAmount >= 1e6) {
+        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + tokenSymbol;
+      } else if (normalizedAmount >= 1e3) {
+        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + tokenSymbol;
       } else {
-        return num.toFixed(4);
+        return normalizedAmount.toFixed(4) + ' ' + tokenSymbol;
       }
     } else {
-      return amount.toFixed(4);
+      // Normalize by appropriate token decimals
+      const normalizedAmount = Math.abs(amount) / Math.pow(10, decimals);
+      
+      if (normalizedAmount >= 1e9) {
+        return (normalizedAmount / 1e9).toFixed(2) + 'B ' + tokenSymbol;
+      } else if (normalizedAmount >= 1e6) {
+        return (normalizedAmount / 1e6).toFixed(2) + 'M ' + tokenSymbol;
+      } else if (normalizedAmount >= 1e3) {
+        return (normalizedAmount / 1e3).toFixed(2) + 'K ' + tokenSymbol;
+      } else {
+        return normalizedAmount.toFixed(4) + ' ' + tokenSymbol;
+      }
     }
   };
 
@@ -82,6 +97,16 @@ const QuotesTable: React.FC = () => {
       return diffInMinutes === 0 ? 'Just now' : `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
     } else {
       return date.toLocaleString();
+    }
+  };
+
+  // Copy to clipboard function
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here if desired
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
     }
   };
 
@@ -135,7 +160,7 @@ const QuotesTable: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    ID
+                    ID (click to copy)
                   </th>
                 </tr>
               </thead>
@@ -155,12 +180,18 @@ const QuotesTable: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <span className={parseFloat(quote.amount.toString()) < 0 ? 'text-red-600' : 'text-green-600'}>
-                        {formatAmount(quote.amount)}
+                        {formatAmount(quote.amount, quote.tokenIn, quote.tokenOut)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                      {quote._id.substring(0, 8)}...
-                    </td>
+                        <button 
+                          onClick={() => copyToClipboard(quote._id)} 
+                          className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
+                          title="Click to copy full ID"
+                        >
+                          {quote._id.substring(0, 8)}...
+                        </button>
+                      </td>
                   </tr>
                 ))}
               </tbody>
