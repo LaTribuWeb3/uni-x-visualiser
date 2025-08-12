@@ -5,7 +5,7 @@ import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'da
 import { getTokenName, getTokenDecimals, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
 import QuotesTable from './QuotesTable';
-import WETHQuotesTable from './WETHQuotesTable';
+
 import { DataProvider, useData } from './DataContext';
 import './App.css';
 
@@ -84,16 +84,7 @@ const Navigation: React.FC = () => {
             >
               Quotes
             </Link>
-            <Link
-              to="/weth-quotes"
-              className={`px-4 py-2 rounded-md font-medium transition-colors border ${
-                location.pathname === '/weth-quotes'
-                  ? 'bg-gray-400 text-black border-gray-500'
-                  : 'bg-gray-200 text-black border-gray-400 hover:bg-gray-300'
-              }`}
-            >
-              WETH Quotes
-            </Link>
+
             <button
               onClick={refreshData}
               disabled={loading}
@@ -504,7 +495,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Dashboard />} />
           <Route path="/transactions" element={<TransactionsTable />} />
           <Route path="/quotes" element={<QuotesTable />} />
-          <Route path="/weth-quotes" element={<WETHQuotesTable />} />
+
         </Routes>
       </Router>
     </DataProvider>
