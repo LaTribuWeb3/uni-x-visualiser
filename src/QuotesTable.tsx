@@ -21,6 +21,14 @@ const QuotesTable: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [count, setCount] = useState<number>(0);
   const [idFilter, setIdFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [selectedTokenIn, setSelectedTokenIn] = useState<string>('all');
+  const [selectedTokenOut, setSelectedTokenOut] = useState<string>('all');
+  const [tokenInSearchValue, setTokenInSearchValue] = useState<string>('');
+  const [tokenOutSearchValue, setTokenOutSearchValue] = useState<string>('');
+  const [showTokenInSuggestions, setShowTokenInSuggestions] = useState<boolean>(false);
+  const [showTokenOutSuggestions, setShowTokenOutSuggestions] = useState<boolean>(false);
 
   const loadQuotes = async () => {
     try {
@@ -56,6 +64,87 @@ const QuotesTable: React.FC = () => {
   const filteredQuotes = quotes.filter(quote => 
     idFilter.trim() === '' || quote._id.toLowerCase().includes(idFilter.toLowerCase())
   );
+
+  // Apply token filters
+  const tokenFilteredQuotes = filteredQuotes.filter(quote => {
+    // Apply tokenIn filter if not "all"
+    if (selectedTokenIn !== 'all' && quote.tokenIn !== selectedTokenIn) {
+      return false;
+    }
+    
+    // Apply tokenOut filter if not "all"
+    if (selectedTokenOut !== 'all' && quote.tokenOut !== selectedTokenOut) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(tokenFilteredQuotes.length / itemsPerPage);
+  const paginatedQuotes = tokenFilteredQuotes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to first page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [idFilter, selectedTokenIn, selectedTokenOut]);
+
+  // Get unique tokens for filtering
+  const getUniqueTokens = () => {
+    const tokenInTokens = new Set<string>();
+    const tokenOutTokens = new Set<string>();
+    
+    quotes.forEach(quote => {
+      tokenInTokens.add(quote.tokenIn);
+      tokenOutTokens.add(quote.tokenOut);
+    });
+    
+    return {
+      tokenInTokens: Array.from(tokenInTokens).sort(),
+      tokenOutTokens: Array.from(tokenOutTokens).sort()
+    };
+  };
+
+  // Get filtered suggestions for autocomplete
+  const getTokenInSuggestions = () => {
+    if (!tokenInSearchValue.trim()) return [];
+    
+    const { tokenInTokens } = getUniqueTokens();
+    return tokenInTokens
+      .filter(token => 
+        getTokenName(token).toLowerCase().includes(tokenInSearchValue.toLowerCase()) ||
+        token.toLowerCase().includes(tokenInSearchValue.toLowerCase())
+      )
+      .slice(0, 8); // Limit to 8 suggestions
+  };
+
+  const getTokenOutSuggestions = () => {
+    if (!tokenOutSearchValue.trim()) return [];
+    
+    const { tokenOutTokens } = getUniqueTokens();
+    return tokenOutTokens
+      .filter(token => 
+        getTokenName(token).toLowerCase().includes(tokenOutSearchValue.toLowerCase()) ||
+        token.toLowerCase().includes(tokenOutSearchValue.toLowerCase())
+      )
+      .slice(0, 8); // Limit to 8 suggestions
+  };
+
+  // Handle token selection
+  const handleTokenInSelect = (tokenAddress: string) => {
+    setSelectedTokenIn(tokenAddress);
+    setTokenInSearchValue(getTokenName(tokenAddress));
+    setShowTokenInSuggestions(false);
+  };
+
+  const handleTokenOutSelect = (tokenAddress: string) => {
+    setSelectedTokenOut(tokenAddress);
+    setTokenOutSearchValue(getTokenName(tokenAddress));
+    setShowTokenOutSuggestions(false);
+  };
 
   const formatAmount = (amount: string | number, tokenInAddress: string, tokenOutAddress: string): string => {
     const isNegative = parseFloat(amount.toString()) < 0;
@@ -147,7 +236,7 @@ const QuotesTable: React.FC = () => {
           <div className="text-center mb-4">
             <h2 className="text-xl font-semibold mb-2">Quotes Overview</h2>
             <p className="text-sm text-gray-600">
-              {filteredQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the SolvX API
+              {tokenFilteredQuotes.length.toLocaleString()} of {count.toLocaleString()} quotes loaded from the SolvX API
             </p>
           </div>
           
@@ -159,19 +248,102 @@ const QuotesTable: React.FC = () => {
                 type="text"
                 value={idFilter}
                 onChange={(e) => setIdFilter(e.target.value)}
-                placeholder="Enter quote ID to filter..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search by quote ID..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              {idFilter.trim() && (
-                <div className="text-center mt-2">
-                  <button
-                    onClick={() => setIdFilter('')}
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Clear ID Filter
-                  </button>
-                </div>
+              {idFilter && (
+                <button
+                  onClick={() => setIdFilter('')}
+                  className="mt-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:underline"
+                >
+                  Clear filter
+                </button>
               )}
+            </div>
+          </div>
+
+          {/* Token Filters */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">Filter by Tokens</label>
+            <div className="flex justify-center items-center gap-2">
+              <div className="relative">
+                <label className="block text-xs text-gray-600 mb-1">Input Token</label>
+                <input
+                  type="text"
+                  value={tokenInSearchValue}
+                  onChange={(e) => {
+                    setTokenInSearchValue(e.target.value);
+                    setShowTokenInSuggestions(true);
+                    if (e.target.value === '') {
+                      setSelectedTokenIn('all');
+                    }
+                  }}
+                  onFocus={() => setShowTokenInSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowTokenInSuggestions(false), 200)}
+                  placeholder="Search input token..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                />
+                {showTokenInSuggestions && getTokenInSuggestions().length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {getTokenInSuggestions().map((token) => (
+                      <div
+                        key={token}
+                        onClick={() => handleTokenInSelect(token)}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                      >
+                        <div className="font-medium">{getTokenName(token)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{token}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="text-gray-700 font-semibold mt-6">→</div>
+              <div className="relative">
+                <label className="block text-xs text-gray-600 mb-1">Output Token</label>
+                <input
+                  type="text"
+                  value={tokenOutSearchValue}
+                  onChange={(e) => {
+                    setTokenOutSearchValue(e.target.value);
+                    setShowTokenOutSuggestions(true);
+                    if (e.target.value === '') {
+                      setSelectedTokenOut('all');
+                    }
+                  }}
+                  onFocus={() => setShowTokenOutSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowTokenOutSuggestions(false), 200)}
+                  placeholder="Search output token..."
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                />
+                {showTokenOutSuggestions && getTokenOutSuggestions().length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {getTokenOutSuggestions().map((token) => (
+                      <div
+                        key={token}
+                        onClick={() => handleTokenOutSelect(token)}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                      >
+                        <div className="font-medium">{getTokenName(token)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{token}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-center mt-2">
+              <button
+                onClick={() => {
+                  setSelectedTokenIn('all');
+                  setSelectedTokenOut('all');
+                  setTokenInSearchValue('');
+                  setTokenOutSearchValue('');
+                }}
+                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:underline"
+              >
+                Clear token filters
+              </button>
             </div>
           </div>
         </div>
@@ -200,7 +372,7 @@ const QuotesTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredQuotes.map((quote) => (
+                {paginatedQuotes.map((quote) => (
                   <tr key={quote._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(quote.processedAt)}
@@ -232,6 +404,73 @@ const QuotesTable: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-400 text-sm font-medium rounded-md text-black bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-400 text-sm font-medium rounded-md text-black bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                    <span className="font-medium">
+                      {Math.min(currentPage * itemsPerPage, tokenFilteredQuotes.length)}
+                    </span>{' '}
+                    of <span className="font-medium">{tokenFilteredQuotes.length}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-400 bg-gray-200 text-sm font-medium text-black hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = i + 1;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            currentPage === pageNum
+                              ? 'z-10 bg-gray-400 border-gray-500 text-black'
+                              : 'bg-gray-200 border-gray-400 text-black hover:bg-gray-300'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-400 bg-gray-200 text-sm font-medium text-black hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
