@@ -265,10 +265,25 @@ const QuotesTable: React.FC = () => {
     loadRequests(50, false); // Start with quick load of 50 entries, no full-screen loading
   };
 
-  const formatAmount = (amount: number, tokenInAddress: string, tokenOutAddress: string): string => {
-    const isNegative = amount < 0;
-    const decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
-    const tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
+  const formatAmount = (amount: number, tokenInAddress: string, tokenOutAddress: string, isRequestAmount: boolean = false): string => {
+    // For quotes, the token denomination depends on whether this is an exact input or exact output request
+    let decimals: number;
+    let tokenSymbol: string;
+    let isNegative: boolean;
+    
+    if (isRequestAmount) {
+      // This is the main request amount - use the original logic
+      isNegative = amount < 0;
+      decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
+      tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
+    } else {
+      // This is a quote amount - the denomination depends on the request type
+      // We need to determine this from the parent request context
+      // For now, we'll use the same logic but this will be overridden in the quotes display
+      isNegative = amount < 0;
+      decimals = isNegative ? getTokenDecimals(tokenOutAddress) : getTokenDecimals(tokenInAddress);
+      tokenSymbol = isNegative ? getTokenName(tokenOutAddress) : getTokenName(tokenInAddress);
+    }
     
     // If we don't have a name for the token, truncate the address
     const displayToken = tokenSymbol === tokenInAddress || tokenSymbol === tokenOutAddress 
@@ -289,6 +304,52 @@ const QuotesTable: React.FC = () => {
       return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
     } else {
       return absAmount.toFixed(4) + ' ' + displayToken;
+    }
+  };
+
+  // Helper function to format quote amounts based on request type
+  const formatQuoteAmount = (quoteAmount: number, requestAmount: number, tokenInAddress: string, tokenOutAddress: string): string => {
+    // Determine if this is an exact input or exact output request
+    const isExactOutput = requestAmount < 0;
+    
+    if (isExactOutput) {
+      // Exact output request: quotes are denominated in output token
+      const decimals = getTokenDecimals(tokenOutAddress);
+      const tokenSymbol = getTokenName(tokenOutAddress);
+      const displayToken = tokenSymbol === tokenOutAddress ? truncateAddress(tokenOutAddress) : tokenSymbol;
+      
+      // Normalize the amount
+      const hasAssociatedAddress = tokenSymbol !== tokenOutAddress;
+      const absAmount = hasAssociatedAddress ? Math.abs(quoteAmount) / Math.pow(10, decimals) : Math.abs(quoteAmount);
+      
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      } else {
+        return absAmount.toFixed(4) + ' ' + displayToken;
+      }
+    } else {
+      // Exact input request: quotes are denominated in input token
+      const decimals = getTokenDecimals(tokenInAddress);
+      const tokenSymbol = getTokenName(tokenInAddress);
+      const displayToken = tokenSymbol === tokenInAddress ? truncateAddress(tokenInAddress) : tokenSymbol;
+      
+      // Normalize the amount
+      const hasAssociatedAddress = tokenSymbol !== tokenInAddress;
+      const absAmount = hasAssociatedAddress ? Math.abs(quoteAmount) / Math.pow(10, decimals) : Math.abs(quoteAmount);
+      
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      } else {
+        return absAmount.toFixed(4) + ' ' + displayToken;
+      }
     }
   };
 
@@ -508,7 +569,7 @@ const QuotesTable: React.FC = () => {
                     Token Out
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Amount
+                    Request Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Quotes Count
@@ -542,9 +603,14 @@ const QuotesTable: React.FC = () => {
                         <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenOut)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                          {formatAmount(request.amount, request.tokenIn, request.tokenOut)}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                            {formatAmount(request.amount, request.tokenIn, request.tokenOut, true)}
+                          </span>
+                          <span className="text-xs text-gray-500 mt-1">
+                            {request.amount < 0 ? 'Exact Output' : 'Exact Input'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {request.quotes.length}
@@ -569,6 +635,13 @@ const QuotesTable: React.FC = () => {
                         <td colSpan={6} className="px-6 py-4 bg-gray-50">
                           <div className="space-y-3">
                             <h4 className="font-medium text-gray-900 text-sm">Quotes for this request:</h4>
+                            <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                              <strong>Note:</strong> This is an <strong>{request.amount < 0 ? 'Exact Output' : 'Exact Input'}</strong> request. 
+                              {request.amount < 0 
+                                ? ` All quote amounts are denominated in ${getTokenName(request.tokenOut)} (output token).`
+                                : ` All quote amounts are denominated in ${getTokenName(request.tokenIn)} (input token).`
+                              }
+                            </div>
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-100">
@@ -577,7 +650,7 @@ const QuotesTable: React.FC = () => {
                                       Processed At
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      Amount
+                                      {request.amount < 0 ? 'Output Amount' : 'Input Amount'}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                       Quote ID
@@ -592,7 +665,7 @@ const QuotesTable: React.FC = () => {
                                        </td>
                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
                                          <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                                           {formatAmount(quote.amount, request.tokenIn, request.tokenOut)}
+                                           {formatQuoteAmount(quote.amount, request.amount, request.tokenIn, request.tokenOut)}
                                          </span>
                                        </td>
                                        <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
