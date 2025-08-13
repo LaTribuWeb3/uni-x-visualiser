@@ -26,7 +26,7 @@ interface SortConfig {
 }
 
 const TransactionsTable: React.FC = () => {
-  const { data, dataRange, loading, error, refreshData } = useData();
+  const { data, dataRange, loading, error } = useData();
   const [filteredData, setFilteredData] = useState<Transaction[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
