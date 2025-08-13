@@ -42,6 +42,7 @@ const QuotesTable: React.FC = () => {
   const [isLoadingFullData, setIsLoadingFullData] = useState(false);
   const [hasFullData, setHasFullData] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [apiResponseCount, setApiResponseCount] = useState<number>(0);
 
   // Debounce ID filter for better performance
   useEffect(() => {
@@ -75,6 +76,9 @@ const QuotesTable: React.FC = () => {
         if (selectedTokenOut !== 'all') {
           params.append('tokenOut', selectedTokenOut);
         }
+        if (idFilter.trim() !== '') {
+          params.append('id', idFilter.trim());
+        }
         params.append('limit', effectiveLimit.toString());
         
         const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
@@ -91,6 +95,7 @@ const QuotesTable: React.FC = () => {
         }
         
         setRequests(jsonData.data);
+        setApiResponseCount(jsonData.count || jsonData.data.length);
         setLoading(false);
         
         // If this was a quick load and we're not filtering by ID, start loading full data in background
@@ -116,6 +121,9 @@ const QuotesTable: React.FC = () => {
         if (selectedTokenOut !== 'all') {
           params.append('tokenOut', selectedTokenOut);
         }
+        if (idFilter.trim() !== '') {
+          params.append('id', idFilter.trim());
+        }
         params.append('limit', effectiveLimit);
         
         const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
@@ -132,6 +140,7 @@ const QuotesTable: React.FC = () => {
         }
         
         setRequests(jsonData.data);
+        setApiResponseCount(jsonData.count || jsonData.data.length);
         setIsLoadingFullData(false);
         setHasFullData(true);
       }
@@ -159,6 +168,9 @@ const QuotesTable: React.FC = () => {
       if (selectedTokenOut !== 'all') {
         params.append('tokenOut', selectedTokenOut);
       }
+      if (idFilter.trim() !== '') {
+        params.append('id', idFilter.trim());
+      }
       params.append('limit', '20000');
       
       const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
@@ -174,9 +186,10 @@ const QuotesTable: React.FC = () => {
         throw new Error('API returned unsuccessful response');
       }
       
-      setRequests(jsonData.data);
-      setIsLoadingFullData(false);
-      setHasFullData(true);
+              setRequests(jsonData.data);
+        setApiResponseCount(jsonData.count || jsonData.data.length);
+        setIsLoadingFullData(false);
+        setHasFullData(true);
     } catch (err) {
       console.error('Background data load failed:', err);
       setIsLoadingFullData(false);
@@ -602,7 +615,12 @@ const QuotesTable: React.FC = () => {
             </button>
             <div className="text-xs text-gray-500 mt-2">
               {hasFullData ? (
-                <span className="text-green-600">✓ Full dataset loaded ({requests.length.toLocaleString()} requests)</span>
+                <span className="text-green-600">
+                  {idFilter.trim() !== '' 
+                    ? `✓ API returned ${apiResponseCount.toLocaleString()} entries`
+                    : `✓ Full dataset loaded (${apiResponseCount.toLocaleString()} requests)`
+                  }
+                </span>
               ) : isLoadingFullData ? (
                 <span className="text-blue-600">Loading full dataset in background...</span>
               ) : (
@@ -619,7 +637,7 @@ const QuotesTable: React.FC = () => {
             <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
               <div className="flex items-center justify-center text-sm text-blue-700">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                Loading full dataset in background... ({requests.length.toLocaleString()} requests loaded so far)
+                Loading full dataset in background... ({apiResponseCount.toLocaleString()} requests loaded so far)
               </div>
             </div>
           )}
