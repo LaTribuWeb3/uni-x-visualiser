@@ -353,6 +353,52 @@ const QuotesTable: React.FC = () => {
     }
   };
 
+  // Helper function to format other amounts (amounts in the opposite token)
+  const formatOtherAmount = (otherAmount: number, requestAmount: number, tokenInAddress: string, tokenOutAddress: string): string => {
+    // Determine if this is an exact input or exact output request
+    const isExactOutput = requestAmount < 0;
+    
+    if (isExactOutput) {
+      // Exact output request: main amount is in output token, so otherAmount is in input token
+      const decimals = getTokenDecimals(tokenInAddress);
+      const tokenSymbol = getTokenName(tokenInAddress);
+      const displayToken = tokenSymbol === tokenInAddress ? truncateAddress(tokenInAddress) : tokenSymbol;
+      
+      // Normalize the amount
+      const hasAssociatedAddress = tokenSymbol !== tokenInAddress;
+      const absAmount = hasAssociatedAddress ? Math.abs(otherAmount) / Math.pow(10, decimals) : Math.abs(otherAmount);
+      
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      } else {
+        return absAmount.toFixed(4) + ' ' + displayToken;
+      }
+    } else {
+      // Exact input request: main amount is in input token, so otherAmount is in output token
+      const decimals = getTokenDecimals(tokenOutAddress);
+      const tokenSymbol = getTokenName(tokenOutAddress);
+      const displayToken = tokenSymbol === tokenOutAddress ? truncateAddress(tokenOutAddress) : tokenSymbol;
+      
+      // Normalize the amount
+      const hasAssociatedAddress = tokenSymbol !== tokenOutAddress;
+      const absAmount = hasAssociatedAddress ? Math.abs(otherAmount) / Math.pow(10, decimals) : Math.abs(otherAmount);
+      
+      if (absAmount >= 1e9) {
+        return (absAmount / 1e9).toFixed(2) + 'B ' + displayToken;
+      } else if (absAmount >= 1e6) {
+        return (absAmount / 1e6).toFixed(2) + 'M ' + displayToken;
+      } else if (absAmount >= 1e3) {
+        return (absAmount / 1e3).toFixed(2) + 'K ' + displayToken;
+      } else {
+        return absAmount.toFixed(4) + ' ' + displayToken;
+      }
+    }
+  };
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -632,7 +678,7 @@ const QuotesTable: React.FC = () => {
                     {/* Expanded quotes section */}
                     {expandedRows.has(request._id) && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                        <td colSpan={7} className="px-6 py-4 bg-gray-50">
                           <div className="space-y-3">
                             <h4 className="font-medium text-gray-900 text-sm">Quotes for this request:</h4>
                             <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
@@ -641,6 +687,8 @@ const QuotesTable: React.FC = () => {
                                 ? ` All quote amounts are denominated in ${getTokenName(request.tokenOut)} (output token).`
                                 : ` All quote amounts are denominated in ${getTokenName(request.tokenIn)} (input token).`
                               }
+                              <br />
+                              <strong>Amount Offered:</strong> Shows the amount being offered in the opposite token for each quote (what you'll receive or need to provide).
                             </div>
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-gray-200">
@@ -651,6 +699,9 @@ const QuotesTable: React.FC = () => {
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                       {request.amount < 0 ? 'Output Amount' : 'Input Amount'}
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                      Amount Offered
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                       Quote ID
@@ -668,12 +719,18 @@ const QuotesTable: React.FC = () => {
                                            {formatQuoteAmount(quote.amount, request.amount, request.tokenIn, request.tokenOut)}
                                          </span>
                                        </td>
+                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                         {quote.otherAmount ? (
+                                           <span className={quote.otherAmount < 0 ? 'text-red-600' : 'text-green-600'}>
+                                             {formatOtherAmount(quote.otherAmount, request.amount, request.tokenIn, request.tokenOut)}
+                                           </span>
+                                         ) : (
+                                           <span className="text-gray-400 italic">N/A</span>
+                                         )}
+                                       </td>
                                        <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
                                          <button 
-                                           onClick={(e) => {
-                                             e.stopPropagation();
-                                             copyToClipboard(quote._id);
-                                           }} 
+                                           onClick={() => copyToClipboard(quote._id)}
                                            className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
                                            title="Click to copy full quote ID"
                                          >
