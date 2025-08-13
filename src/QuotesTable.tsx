@@ -44,6 +44,7 @@ const QuotesTable: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [apiResponseCount, setApiResponseCount] = useState<number>(0);
   const [groupSimilarRequests, setGroupSimilarRequests] = useState<boolean>(false);
+  const [groupTimeThreshold, setGroupTimeThreshold] = useState<number>(60); // Default: 1 hour (in minutes)
 
   // Group similar requests together
   const groupRequests = (requests: Request[]): Request[][] => {
@@ -69,7 +70,7 @@ const QuotesTable: React.FC = () => {
           otherRequest.tokenIn === request.tokenIn &&
           otherRequest.tokenOut === request.tokenOut &&
           Math.abs(otherRequest.amount - request.amount) < 0.000001 && // Small tolerance for floating point
-          Math.abs(new Date(otherRequest.processedAt).getTime() - new Date(request.processedAt).getTime()) < 60 * 60 * 1000; // 1 hour
+          Math.abs(new Date(otherRequest.processedAt).getTime() - new Date(request.processedAt).getTime()) < groupTimeThreshold * 60 * 1000; // Use selected threshold
 
         if (isSimilar) {
           similarRequests.push(otherRequest);
@@ -658,11 +659,31 @@ const QuotesTable: React.FC = () => {
               <div className="relative group">
                 <div className="text-gray-400 hover:text-gray-600 cursor-help">ⓘ</div>
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
-                  Groups requests with same tokens, amount, and within 1 hour timeframe
+                  Groups requests with same tokens, amount, and within selected timeframe
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
                 </div>
               </div>
             </div>
+            
+            {/* Time Threshold Dropdown */}
+            {groupSimilarRequests && (
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <label htmlFor="groupTimeThreshold" className="text-sm text-gray-600">
+                  Time threshold:
+                </label>
+                <select
+                  id="groupTimeThreshold"
+                  value={groupTimeThreshold}
+                  onChange={(e) => setGroupTimeThreshold(Number(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={5}>5 minutes</option>
+                  <option value={15}>15 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 hour</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Fetch Data Button */}
@@ -799,7 +820,7 @@ const QuotesTable: React.FC = () => {
                             </h4>
                             {group.length > 1 && (
                               <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
-                                <strong>Grouped:</strong> These {group.length} requests have the same tokens, amount, and were made within 1 hour of each other.
+                                <strong>Grouped:</strong> These {group.length} requests have the same tokens, amount, and were made within {groupTimeThreshold === 60 ? '1 hour' : `${groupTimeThreshold} minutes`} of each other.
                               </div>
                             )}
                             <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
