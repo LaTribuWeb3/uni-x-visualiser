@@ -43,6 +43,45 @@ const QuotesTable: React.FC = () => {
   const [hasFullData, setHasFullData] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [apiResponseCount, setApiResponseCount] = useState<number>(0);
+  const [groupSimilarRequests, setGroupSimilarRequests] = useState<boolean>(false);
+
+  // Group similar requests together
+  const groupRequests = (requests: Request[]): Request[][] => {
+    if (!groupSimilarRequests) {
+      return requests.map(req => [req]); // Return each request as its own group
+    }
+
+    const groups: Request[][] = [];
+    const processed = new Set<string>();
+
+    requests.forEach(request => {
+      if (processed.has(request._id)) return;
+
+      const similarRequests: Request[] = [request];
+      processed.add(request._id);
+
+      // Find similar requests
+      requests.forEach(otherRequest => {
+        if (otherRequest._id === request._id || processed.has(otherRequest._id)) return;
+
+        // Check if requests are similar (same tokens, amount, and within 1 hour)
+        const isSimilar = 
+          otherRequest.tokenIn === request.tokenIn &&
+          otherRequest.tokenOut === request.tokenOut &&
+          Math.abs(otherRequest.amount - request.amount) < 0.000001 && // Small tolerance for floating point
+          Math.abs(new Date(otherRequest.processedAt).getTime() - new Date(request.processedAt).getTime()) < 60 * 60 * 1000; // 1 hour
+
+        if (isSimilar) {
+          similarRequests.push(otherRequest);
+          processed.add(otherRequest._id);
+        }
+      });
+
+      groups.push(similarRequests);
+    });
+
+    return groups;
+  };
 
   // Debounce ID filter for better performance
   useEffect(() => {
@@ -222,11 +261,14 @@ const QuotesTable: React.FC = () => {
     return true;
   });
 
-  console.log(filteredRequests)
+  // Group the filtered requests
+  const groupedRequests = groupRequests(filteredRequests);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
-  const paginatedRequests = filteredRequests.slice(
+  console.log(groupedRequests)
+
+  // Pagination logic - now working with groups
+  const totalPages = Math.ceil(groupedRequests.length / itemsPerPage);
+  const paginatedGroups = groupedRequests.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -265,6 +307,7 @@ const QuotesTable: React.FC = () => {
       .slice(0, 8); // Limit to 8 suggestions
   };
 
+  // Get filtered suggestions for autocomplete
   const getTokenOutSuggestions = () => {
     if (!tokenOutSearchValue.trim()) return [];
     
@@ -599,6 +642,29 @@ const QuotesTable: React.FC = () => {
             </div>
           </div>
 
+          {/* Grouping Filter */}
+          <div className="mt-4 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="checkbox"
+                id="groupSimilarRequests"
+                checked={groupSimilarRequests}
+                onChange={(e) => setGroupSimilarRequests(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="groupSimilarRequests" className="text-sm font-medium text-gray-700">
+                Group similar requests
+              </label>
+              <div className="relative group">
+                <div className="text-gray-400 hover:text-gray-600 cursor-help">ⓘ</div>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+                  Groups requests with same tokens, amount, and within 1 hour timeframe
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Fetch Data Button */}
           <div className="mt-6 text-center">
             <button
@@ -667,134 +733,157 @@ const QuotesTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedRequests.map((request) => (
-                  <React.Fragment key={request._id}>
+                {paginatedGroups.map((group, groupIndex) => (
+                  <React.Fragment key={group[0]._id}>
                     <tr 
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => toggleRowExpansion(request._id)}
+                      onClick={() => toggleRowExpansion(group[0]._id)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex items-center">
                           <span className="mr-2">
-                            {expandedRows.has(request._id) ? '▼' : '▶'}
+                            {expandedRows.has(group[0]._id) ? '▼' : '▶'}
                           </span>
                           <div className="flex flex-col">
-                            <span>{formatDate(request.processedAt).fullDate}</span>
-                            {formatDate(request.processedAt).relativeTime && (
+                            <span>{formatDate(group[0].processedAt).fullDate}</span>
+                            {formatDate(group[0].processedAt).relativeTime && (
                               <span className="text-xs text-blue-600 font-medium">
-                                {formatDate(request.processedAt).relativeTime}
+                                {formatDate(group[0].processedAt).relativeTime}
                               </span>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <div className="font-semibold">{getTokenName(request.tokenIn)}</div>
-                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenIn)}</div>
+                        <div className="font-semibold">{getTokenName(group[0].tokenIn)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(group[0].tokenIn)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <div className="font-semibold">{getTokenName(request.tokenOut)}</div>
-                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(request.tokenOut)}</div>
+                        <div className="font-semibold">{getTokenName(group[0].tokenOut)}</div>
+                        <div className="text-xs text-gray-500 font-mono">{truncateAddress(group[0].tokenOut)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         <div className="flex flex-col">
-                          <span className={request.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                            {formatAmount(request.amount, request.tokenIn, request.tokenOut, true)}
+                          <span className={group[0].amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                            {formatAmount(group[0].amount, group[0].tokenIn, group[0].tokenOut, true)}
                           </span>
                           <span className="text-xs text-gray-500 mt-1">
-                            {request.amount < 0 ? 'Exact Output' : 'Exact Input'}
+                            {group[0].amount < 0 ? 'Exact Output' : 'Exact Input'}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {request.quotes.length}
+                        {group.reduce((total, req) => total + req.quotes.length, 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyToClipboard(request._id);
+                            copyToClipboard(group[0]._id);
                           }} 
                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left w-full"
                           title="Click to copy full ID"
                         >
-                          {request._id.substring(0, 8)}...
+                          {group[0]._id.substring(0, 8)}...
                         </button>
                       </td>
                     </tr>
                     
                     {/* Expanded quotes section */}
-                    {expandedRows.has(request._id) && (
+                    {expandedRows.has(group[0]._id) && (
                       <tr>
                         <td colSpan={7} className="px-6 py-4 bg-gray-50">
                           <div className="space-y-3">
-                            <h4 className="font-medium text-gray-900 text-sm">Quotes for this request:</h4>
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {group.length > 1 ? `Similar Requests (${group.length} requests)` : 'Quotes for this request:'}
+                            </h4>
+                            {group.length > 1 && (
+                              <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                                <strong>Grouped:</strong> These {group.length} requests have the same tokens, amount, and were made within 1 hour of each other.
+                              </div>
+                            )}
                             <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
-                              <strong>Note:</strong> This is an <strong>{request.amount < 0 ? 'Exact Output' : 'Exact Input'}</strong> request. 
-                              {request.amount < 0 
-                                ? ` All quote amounts are denominated in ${getTokenName(request.tokenOut)} (output token).`
-                                : ` All quote amounts are denominated in ${getTokenName(request.tokenIn)} (input token).`
+                              <strong>Note:</strong> This is an <strong>{group[0].amount < 0 ? 'Exact Output' : 'Exact Input'}</strong> request. 
+                              {group[0].amount < 0 
+                                ? ` All quote amounts are denominated in ${getTokenName(group[0].tokenOut)} (output token).`
+                                : ` All quote amounts are denominated in ${getTokenName(group[0].tokenIn)} (input token).`
                               }
                             </div>
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-100">
-                                  <tr>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      Processed At
-                                    </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      {request.amount < 0 ? 'Output Amount' : 'Input Amount'}
-                                    </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      Amount Offered
-                                    </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                      Quote ID
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                                                     {request.quotes.map((quote) => (
-                                     <tr key={quote._id} className="hover:bg-gray-100">
-                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                                         <div className="flex flex-col">
-                                           <span>{formatDate(quote.processedAt).fullDate}</span>
-                                           {formatDate(quote.processedAt).relativeTime && (
-                                             <span className="text-xs text-blue-600 font-medium">
-                                               {formatDate(quote.processedAt).relativeTime}
-                                             </span>
-                                           )}
-                                         </div>
-                                       </td>
-                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
-                                         <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
-                                           {formatQuoteAmount(quote.amount, request.amount, request.tokenIn, request.tokenOut)}
-                                         </span>
-                                       </td>
-                                       <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
-                                         {quote.otherAmount ? (
-                                           <span className={quote.otherAmount < 0 ? 'text-red-600' : 'text-green-600'}>
-                                             {formatOtherAmount(quote.otherAmount, request.amount, request.tokenIn, request.tokenOut)}
-                                           </span>
-                                         ) : (
-                                           <span className="text-gray-400 italic">N/A</span>
-                                         )}
-                                       </td>
-                                       <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
-                                         <button 
-                                           onClick={() => copyToClipboard(quote._id)}
-                                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                                           title="Click to copy full quote ID"
-                                         >
-                                           {quote._id.substring(0, 8)}...
-                                         </button>
-                                       </td>
-                                     </tr>
-                                   ))}
-                                </tbody>
-                              </table>
-                            </div>
+                            
+                            {group.map((request, requestIndex) => (
+                              <div key={request._id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                                {group.length > 1 && (
+                                  <div className="mb-2 pb-2 border-b border-gray-200">
+                                    <h5 className="font-medium text-sm text-gray-700">
+                                      Request {requestIndex + 1} - {formatDate(request.processedAt).fullDate}
+                                    </h5>
+                                    <div className="text-xs text-gray-500 font-mono">
+                                      ID: {request._id.substring(0, 8)}...
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="overflow-x-auto">
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-100">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                          Processed At
+                                        </th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                          {request.amount < 0 ? 'Output Amount' : 'Input Amount'}
+                                        </th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                          Amount Offered
+                                        </th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                          Quote ID
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                      {request.quotes.map((quote) => (
+                                        <tr key={quote._id} className="hover:bg-gray-100">
+                                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                                            <div className="flex flex-col">
+                                              <span>{formatDate(quote.processedAt).fullDate}</span>
+                                              {formatDate(quote.processedAt).relativeTime && (
+                                                <span className="text-xs text-blue-600 font-medium">
+                                                  {formatDate(quote.processedAt).relativeTime}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                            <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
+                                              {formatQuoteAmount(quote.amount, request.amount, request.tokenIn, request.tokenOut)}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                            {quote.otherAmount ? (
+                                              <span className={quote.otherAmount < 0 ? 'text-red-600' : 'text-green-600'}>
+                                                {formatOtherAmount(quote.otherAmount, request.amount, request.tokenIn, request.tokenOut)}
+                                              </span>
+                                            ) : (
+                                              <span className="text-gray-400 italic">N/A</span>
+                                            )}
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-gray-900">
+                                            <button 
+                                              onClick={() => copyToClipboard(quote._id)}
+                                              className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                                              title="Click to copy full quote ID"
+                                            >
+                                              {quote._id.substring(0, 8)}...
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </td>
                       </tr>
@@ -829,9 +918,9 @@ const QuotesTable: React.FC = () => {
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, filteredRequests.length)}
+                      {Math.min(currentPage * itemsPerPage, groupedRequests.length)}
                     </span>{' '}
-                    of <span className="font-medium">{filteredRequests.length}</span> results
+                    of <span className="font-medium">{groupedRequests.length}</span> {groupSimilarRequests ? 'groups' : 'results'}
                   </p>
                 </div>
                 <div>
