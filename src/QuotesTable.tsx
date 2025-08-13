@@ -44,7 +44,7 @@ const QuotesTable: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [apiResponseCount, setApiResponseCount] = useState<number>(0);
   const [groupSimilarRequests, setGroupSimilarRequests] = useState<boolean>(false);
-  const [groupTimeThreshold, setGroupTimeThreshold] = useState<number>(60); // Default: 1 hour (in minutes)
+  const [groupTimeThreshold, setGroupTimeThreshold] = useState<number>(5); // Default: 5 minutes (in minutes)
 
   // Group similar requests together
   const groupRequests = (requests: Request[]): Request[][] => {
@@ -754,7 +754,7 @@ const QuotesTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedGroups.map((group, groupIndex) => (
+                {paginatedGroups.map((group) => (
                   <React.Fragment key={group[0]._id}>
                     <tr 
                       className="hover:bg-gray-50 cursor-pointer"
