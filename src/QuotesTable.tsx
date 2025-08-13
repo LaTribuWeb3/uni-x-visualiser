@@ -399,15 +399,18 @@ const QuotesTable: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString: string): { fullDate: string; relativeTime?: string } => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
+    const fullDate = date.toLocaleString();
+    
     if (diffInMinutes < 60) {
-      return diffInMinutes === 0 ? 'Just now' : `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
+      const relativeTime = diffInMinutes === 0 ? 'Just now' : `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
+      return { fullDate, relativeTime };
     } else {
-      return date.toLocaleString();
+      return { fullDate };
     }
   };
 
@@ -637,7 +640,14 @@ const QuotesTable: React.FC = () => {
                           <span className="mr-2">
                             {expandedRows.has(request._id) ? '▼' : '▶'}
                           </span>
-                          {formatDate(request.processedAt)}
+                          <div className="flex flex-col">
+                            <span>{formatDate(request.processedAt).fullDate}</span>
+                            {formatDate(request.processedAt).relativeTime && (
+                              <span className="text-xs text-blue-600 font-medium">
+                                {formatDate(request.processedAt).relativeTime}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
@@ -712,7 +722,14 @@ const QuotesTable: React.FC = () => {
                                                                      {request.quotes.map((quote) => (
                                      <tr key={quote._id} className="hover:bg-gray-100">
                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                                         {formatDate(quote.processedAt)}
+                                         <div className="flex flex-col">
+                                           <span>{formatDate(quote.processedAt).fullDate}</span>
+                                           {formatDate(quote.processedAt).relativeTime && (
+                                             <span className="text-xs text-blue-600 font-medium">
+                                               {formatDate(quote.processedAt).relativeTime}
+                                             </span>
+                                           )}
+                                         </div>
                                        </td>
                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
                                          <span className={quote.amount < 0 ? 'text-red-600' : 'text-green-600'}>
