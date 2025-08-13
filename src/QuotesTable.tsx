@@ -45,6 +45,7 @@ const QuotesTable: React.FC = () => {
   const [apiResponseCount, setApiResponseCount] = useState<number>(0);
   const [groupSimilarRequests, setGroupSimilarRequests] = useState<boolean>(false);
   const [groupTimeThreshold, setGroupTimeThreshold] = useState<number>(5); // Default: 5 minutes (in minutes)
+  const [documentLimit, setDocumentLimit] = useState<number>(20000); // Default: 20k documents
 
   // Group similar requests together
   const groupRequests = (requests: Request[]): Request[][] => {
@@ -139,7 +140,7 @@ const QuotesTable: React.FC = () => {
         setLoading(false);
         
         // If this was a quick load and we're not filtering by ID, start loading full data in background
-        if (limit < 20000 && idFilter.trim() === '') {
+        if (limit < documentLimit && idFilter.trim() === '') {
           loadFullDataInBackground();
         }
       } else {
@@ -148,7 +149,7 @@ const QuotesTable: React.FC = () => {
         setError('');
         
         // Determine appropriate limit based on filters
-        let effectiveLimit = '20000';
+        let effectiveLimit = documentLimit.toString();
         if (idFilter.trim() !== '') {
           // When filtering by ID, use a moderate limit to allow for proper filtering
           effectiveLimit = '100';
@@ -211,7 +212,7 @@ const QuotesTable: React.FC = () => {
       if (idFilter.trim() !== '') {
         params.append('id', idFilter.trim());
       }
-      params.append('limit', '20000');
+      params.append('limit', documentLimit.toString());
       
       const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
       const response = await fetch(url);
@@ -686,6 +687,35 @@ const QuotesTable: React.FC = () => {
             )}
           </div>
 
+          {/* Document Limit Filter */}
+          <div className="mt-4 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <label htmlFor="documentLimit" className="text-sm font-medium text-gray-700">
+                Document limit:
+              </label>
+              <select
+                id="documentLimit"
+                value={documentLimit}
+                onChange={(e) => setDocumentLimit(Number(e.target.value))}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value={1000}>1,000</option>
+                <option value={5000}>5,000</option>
+                <option value={10000}>10,000</option>
+                <option value={20000}>20,000</option>
+                <option value={50000}>50,000</option>
+                <option value={100000}>100,000</option>
+              </select>
+              <div className="relative group">
+                <div className="text-gray-400 hover:text-gray-600 cursor-help">ⓘ</div>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+                  Maximum number of documents to fetch from the API
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Fetch Data Button */}
           <div className="mt-6 text-center">
             <button
@@ -705,13 +735,13 @@ const QuotesTable: React.FC = () => {
                 <span className="text-green-600">
                   {idFilter.trim() !== '' 
                     ? `✓ API returned ${apiResponseCount.toLocaleString()} entries`
-                    : `✓ Full dataset loaded (${apiResponseCount.toLocaleString()} requests)`
+                    : `✓ Full dataset loaded (${apiResponseCount.toLocaleString()} requests, limit: ${documentLimit.toLocaleString()})`
                   }
                 </span>
               ) : isLoadingFullData ? (
-                <span className="text-blue-600">Loading full dataset in background...</span>
+                <span className="text-blue-600">Loading full dataset in background... ({apiResponseCount.toLocaleString()} requests loaded so far)</span>
               ) : (
-                <span>Current filters will be applied when fetching new data</span>
+                <span>Current filters will be applied when fetching new data (limit: {documentLimit.toLocaleString()})</span>
               )}
             </div>
           </div>
