@@ -61,6 +61,13 @@ const QuotesTable: React.FC = () => {
         }
         setError('');
         
+        // Determine appropriate limit based on filters
+        let effectiveLimit = limit;
+        if (idFilter.trim() !== '') {
+          // When filtering by ID, use a moderate limit to allow for proper filtering
+          effectiveLimit = Math.min(limit, 100);
+        }
+        
         const params = new URLSearchParams();
         if (selectedTokenIn !== 'all') {
           params.append('tokenIn', selectedTokenIn);
@@ -68,7 +75,7 @@ const QuotesTable: React.FC = () => {
         if (selectedTokenOut !== 'all') {
           params.append('tokenOut', selectedTokenOut);
         }
-        params.append('limit', limit.toString());
+        params.append('limit', effectiveLimit.toString());
         
         const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
         const response = await fetch(url);
@@ -86,14 +93,21 @@ const QuotesTable: React.FC = () => {
         setRequests(jsonData.data);
         setLoading(false);
         
-        // If this was a quick load, start loading full data in background
-        if (limit < 20000) {
+        // If this was a quick load and we're not filtering by ID, start loading full data in background
+        if (limit < 20000 && idFilter.trim() === '') {
           loadFullDataInBackground();
         }
       } else {
         // Full load (called by user clicking Fetch Data button)
         setIsLoadingFullData(true);
         setError('');
+        
+        // Determine appropriate limit based on filters
+        let effectiveLimit = '20000';
+        if (idFilter.trim() !== '') {
+          // When filtering by ID, use a moderate limit to allow for proper filtering
+          effectiveLimit = '100';
+        }
         
         const params = new URLSearchParams();
         if (selectedTokenIn !== 'all') {
@@ -102,7 +116,7 @@ const QuotesTable: React.FC = () => {
         if (selectedTokenOut !== 'all') {
           params.append('tokenOut', selectedTokenOut);
         }
-        params.append('limit', '20000');
+        params.append('limit', effectiveLimit);
         
         const url = `https://mm.la-tribu.xyz/api/solvxQuotes?${params.toString()}`;
         const response = await fetch(url);
@@ -130,6 +144,12 @@ const QuotesTable: React.FC = () => {
 
   const loadFullDataInBackground = async () => {
     try {
+      // Don't load full data in background if filtering by ID
+      if (idFilter.trim() !== '') {
+        setIsLoadingFullData(false);
+        return;
+      }
+      
       setIsLoadingFullData(true);
       
       const params = new URLSearchParams();
@@ -171,7 +191,7 @@ const QuotesTable: React.FC = () => {
 
   // Filter requests based on all filters (now working locally)
   const filteredRequests = requests.filter(request => {
-    // ID filter
+    // ID filter - always apply to ensure we have the right result
     if (idFilterDebounced.trim() !== '' && !request._id.toLowerCase().includes(idFilterDebounced.toLowerCase())) {
       return false;
     }
@@ -697,8 +717,6 @@ const QuotesTable: React.FC = () => {
                                 ? ` All quote amounts are denominated in ${getTokenName(request.tokenOut)} (output token).`
                                 : ` All quote amounts are denominated in ${getTokenName(request.tokenIn)} (input token).`
                               }
-                              <br />
-                              <strong>Amount Offered:</strong> Shows the amount being offered in the opposite token for each quote (what you'll receive or need to provide).
                             </div>
                             <div className="overflow-x-auto">
                               <table className="min-w-full divide-y divide-gray-200">
