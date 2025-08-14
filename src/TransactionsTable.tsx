@@ -781,6 +781,12 @@ const TransactionsTable: React.FC = () => {
                     )}
                   </th>
                   <th 
+                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
+                    title="1 tokenIn = x tokenOut"
+                  >
+                    Price
+                  </th>
+                  <th 
                     className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('filler')}
                   >
@@ -876,6 +882,18 @@ const TransactionsTable: React.FC = () => {
                         >
                           {outputVolumeInfo.display} {getTokenName(transaction.outputTokenAddress)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {transaction.openPrice ? (
+                          <span 
+                            className="font-medium text-gray-900 cursor-help" 
+                            title={`1 ${getTokenName(transaction.inputTokenAddress)} = ${parseFloat(transaction.openPrice).toFixed(6)} ${getTokenName(transaction.outputTokenAddress)}`}
+                          >
+                            {parseFloat(transaction.openPrice).toFixed(3)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">N/A</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {(transaction as any).filler ? (
