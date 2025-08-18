@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { getTokenName, getTokenDecimals, formatVolume, truncateAddress } from './utils';
 import apiService from './services/api';
-import { Transaction } from './types/Transaction';
+import type { Transaction } from './types/Transaction';
 
 interface SortConfig {
   key: keyof Transaction | 'formattedDate' | 'inputVolume' | 'outputVolume';
@@ -27,19 +27,7 @@ const TransactionsTable: React.FC = () => {
   const [outputSearchValue, setOutputSearchValue] = useState<string>('');
   const [showInputSuggestions, setShowInputSuggestions] = useState<boolean>(false);
   const [showOutputSuggestions, setShowOutputSuggestions] = useState<boolean>(false);
-  const [pagination, setPagination] = useState<{
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  } | null>(null);
-  const [metadata, setMetadata] = useState<{
-    totalCount: number;
-    dateRange: { min: Date | null; max: Date | null };
-    uniqueTokens: { inputTokens: string[]; outputTokens: string[] };
-  } | null>(null);
+
 
   // Load metadata and initial display data efficiently
   useEffect(() => {
@@ -52,7 +40,6 @@ const TransactionsTable: React.FC = () => {
         
         // Load metadata (counts, date ranges, unique tokens)
         const metadataResult = await apiService.getMetadata();
-        setMetadata(metadataResult);
         
         if (metadataResult.totalCount === 0) {
           setError('No data found in database. Please run the CSV import script first.');
@@ -100,7 +87,6 @@ const TransactionsTable: React.FC = () => {
       });
       
       setData(result.transactions);
-      setPagination(result.pagination);
     } catch (err) {
       console.error('Error loading display data:', err);
       setError(`Error loading display data: ${err}`);
@@ -197,7 +183,7 @@ const TransactionsTable: React.FC = () => {
     const end = endOfDay(new Date(endDate));
 
     let filtered = data.filter(transaction => {
-      const transactionDate = fromUnixTime(parseInt(transaction.decayStartTime));
+      const transactionDate = fromUnixTime(transaction.decayStartTime);
       return isWithinInterval(transactionDate, { start, end });
     });
 
@@ -227,8 +213,8 @@ const TransactionsTable: React.FC = () => {
 
       switch (sortConfig.key) {
         case 'formattedDate':
-          aValue = fromUnixTime(parseInt(a.decayStartTime));
-          bValue = fromUnixTime(parseInt(b.decayStartTime));
+          aValue = fromUnixTime(a.decayStartTime);
+          bValue = fromUnixTime(b.decayStartTime);
           break;
         case 'inputVolume': {
           const inputDecimalsA = getTokenDecimals(a.inputTokenAddress);
@@ -245,8 +231,8 @@ const TransactionsTable: React.FC = () => {
           break;
         }
         default:
-          aValue = a[sortConfig.key];
-          bValue = b[sortConfig.key];
+          aValue = (a[sortConfig.key] as string | number | Date) ?? '';
+          bValue = (b[sortConfig.key] as string | number | Date) ?? '';
       }
 
       if (aValue < bValue) {
@@ -532,7 +518,7 @@ const TransactionsTable: React.FC = () => {
                   const outputVolume = parseFloat(transaction.outputTokenAmountOverride) / Math.pow(10, outputDecimals);
                   const inputVolumeInfo = formatVolume(inputVolume);
                   const outputVolumeInfo = formatVolume(outputVolume);
-                  const transactionDate = fromUnixTime(parseInt(transaction.decayStartTime));
+                  const transactionDate = fromUnixTime(transaction.decayStartTime);
 
                   return (
                     <tr key={`${transaction.orderHash}-${index}`} className="hover:bg-gray-50">

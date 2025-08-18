@@ -54,6 +54,9 @@ async function bulkEnrichmentSimple() {
       .toArray(); // Process ALL transactions
 
     console.log(`📋 Found ${transactions.length} transactions to enrich`);
+    
+    // Wait 1 minute (1 * 60 * 1000 milliseconds)
+    await new Promise((resolve) => setTimeout(resolve, 1 * 60 * 1000));
 
     for (let i = 0; i < transactions.length; i++) {
       const transaction = transactions[i];

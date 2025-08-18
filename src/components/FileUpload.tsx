@@ -79,7 +79,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
 
     // Validate file type
     if (!file.name.toLowerCase().endsWith('.csv')) {
-      setError('Please select a CSV file');
+      uploadStateManager.setError('Please select a CSV file');
       return;
     }
 
@@ -140,11 +140,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
             break;
           case 'inserting':
             stage = 'inserting';
-            details = `Inserted ${progressData.insertedCount || 0}/${progressData.totalValid || 0} transactions`;
+            details = `Inserted ${progressData.insertedCount || 0}/${progressData.validCount || 0} transactions`;
             break;
           case 'complete':
             stage = 'complete';
-            details = `${progressData.count} transactions imported`;
+            details = `${progressData.insertedCount || 0} transactions imported`;
             break;
           case 'error':
             stage = 'error';
@@ -317,9 +317,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
                        <div
                          key={stage}
                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
-                           uploadState.progress.stage === stage 
+                           uploadState.progress?.stage === stage 
                              ? 'bg-blue-100 text-blue-800 scale-110 shadow-md'
-                             : uploadState.progress.stage === 'complete' || uploadState.progress.stage === 'error'
+                             : uploadState.progress?.stage === 'complete' || uploadState.progress?.stage === 'error'
                              ? 'bg-green-100 text-green-800'
                              : 'bg-gray-100 text-gray-500'
                          }`}
@@ -330,7 +330,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
                    </div>
 
                    {/* Processing Animation */}
-                   {uploadState.progress.stage !== 'complete' && uploadState.progress.stage !== 'error' && (
+                   {uploadState.progress?.stage !== 'complete' && uploadState.progress?.stage !== 'error' && (
                     <div className="flex justify-center space-x-1">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -377,7 +377,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
                )}
               
               {/* File Preview */}
-              {selectedFile && !isUploading && (
+              {selectedFile && !uploadState.isUploading && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center justify-center space-x-2">
                     <span className="text-green-600">📄</span>

@@ -25,10 +25,10 @@ app.use(express.json());
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, 'uploads/');
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
@@ -36,7 +36,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
       cb(null, true);
     } else {
@@ -171,7 +171,7 @@ function validateTransaction(row: CsvRow, index: number): Transaction | null {
   try {
     BigInt(row.inputStartAmount);
     BigInt(row.outputTokenAmountOverride);
-  } catch (error) {
+  } catch {
     console.warn(`⚠️  Row ${index + 1}: Invalid amount field`);
     return null;
   }
@@ -314,7 +314,7 @@ async function connectToMongoDB() {
  *                   type: string
  *                   example: "Connected"
  */
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Uni-X Visualizer Backend is running',
@@ -351,7 +351,7 @@ app.get('/api/health', (req, res) => {
  *                 lastActivity:
  *                   type: number
  */
-app.get('/api/upload/status', (req, res) => {
+app.get('/api/upload/status', (_req, res) => {
   res.json(currentUpload);
 });
 
@@ -382,7 +382,7 @@ app.get('/api/upload/status', (req, res) => {
  *                   type: string
  *                   example: "Database not connected"
  */
-app.get('/api/transactions', async (req, res) => {
+app.get('/api/transactions', async (_req, res) => {
   try {
     console.log('📡 GET /api/transactions - Request received');
     
@@ -502,7 +502,12 @@ app.get('/api/transactions/filtered', async (req, res) => {
     } = req.query;
 
     // Build query
-    const query: Record<string, any> = {};
+    interface TransactionsFilter {
+      decayStartTime?: { $gte?: number; $lte?: number };
+      inputTokenAddress?: string;
+      outputTokenAddress?: string;
+    }
+    const query: TransactionsFilter = {};
 
     if (startDate || endDate) {
       query.decayStartTime = {};
@@ -545,7 +550,7 @@ app.get('/api/transactions/filtered', async (req, res) => {
 });
 
 // Get date range
-app.get('/api/transactions/date-range', async (req, res) => {
+app.get('/api/transactions/date-range', async (_req, res) => {
   try {
     if (!transactionsCollection) {
       return res.status(500).json({ error: 'Database not connected' });
@@ -571,7 +576,7 @@ app.get('/api/transactions/date-range', async (req, res) => {
 });
 
 // Get unique tokens
-app.get('/api/transactions/unique-tokens', async (req, res) => {
+app.get('/api/transactions/unique-tokens', async (_req, res) => {
   try {
     if (!transactionsCollection) {
       return res.status(500).json({ error: 'Database not connected' });
@@ -717,7 +722,7 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       progress: 20
     }) + '\n');
 
-    const parseResult = Papa.parse(csvContent, {
+    const parseResult = Papa.parse<CsvRow>(csvContent, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.trim(),
@@ -763,7 +768,7 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
       console.log(`🔍 Validating batch ${batchNumber}/${totalBatches} (rows ${i + 1}-${Math.min(i + batchSize, totalRows)})`);
       
       // Process batch
-      batch.forEach((row: any, index: number) => {
+      batch.forEach((row: CsvRow, index: number) => {
         const transaction = validateTransaction(row, i + index);
         if (transaction) {
           validTransactions.push(transaction);
@@ -896,7 +901,7 @@ app.post('/api/transactions/upload', upload.single('file'), async (req, res) => 
 });
 
 // Clear all transactions
-app.delete('/api/transactions', async (req, res) => {
+app.delete('/api/transactions', async (_req, res) => {
   try {
     if (!transactionsCollection) {
       return res.status(500).json({ error: 'Database not connected' });
@@ -915,13 +920,15 @@ app.delete('/api/transactions', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Mark next as used to satisfy lint rules while keeping 4-arg signature
+  void _next;
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 // Get metadata (counts, date ranges, unique tokens)
-app.get('/api/transactions/metadata', async (req, res) => {
+app.get('/api/transactions/metadata', async (_req, res) => {
   try {
     if (!transactionsCollection) {
       return res.status(500).json({ error: 'Database not connected' });
@@ -979,13 +986,7 @@ app.get('/api/transactions/statistics', async (req, res) => {
     const { startDate, endDate } = req.query;
     
     // Build date filter
-    interface DateFilter {
-      decayStartTime?: {
-        $gte?: number;
-        $lte?: number;
-      };
-    }
-    
+    type DateFilter = { decayStartTime?: { $gte?: number; $lte?: number } };
     const dateFilter: DateFilter = {};
     if (startDate || endDate) {
       dateFilter.decayStartTime = {};
@@ -1086,7 +1087,12 @@ app.get('/api/transactions/display', async (req, res) => {
     } = req.query;
 
     // Build query
-    const query: Record<string, any> = {};
+    interface TransactionsDisplayFilter {
+      decayStartTime?: { $gte?: number; $lte?: number };
+      inputTokenAddress?: string;
+      outputTokenAddress?: string;
+    }
+    const query: TransactionsDisplayFilter = {};
 
     if (startDate || endDate) {
       query.decayStartTime = {};
@@ -1151,7 +1157,8 @@ app.get('/api/transactions/pairs', async (req, res) => {
     const { startDate, endDate } = req.query;
     
     // Build date filter
-    const dateFilter: Record<string, any> = {};
+    type DateFilter = { decayStartTime?: { $gte?: number; $lte?: number } };
+    const dateFilter: DateFilter = {};
     if (startDate || endDate) {
       dateFilter.decayStartTime = {};
       if (startDate) {
@@ -1204,7 +1211,7 @@ app.get('/api/transactions/pairs', async (req, res) => {
 
 
 // 404 handler - must be last
-app.use('*', (req, res) => {
+app.use('*', (_req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
