@@ -176,5 +176,28 @@ async function bulkEnrichmentSimple() {
   }
 }
 
-// Run the script
-bulkEnrichmentSimple().catch(console.error);
+async function runPeriodicEnrichment() {
+  let iteration = 1;
+  
+  while (true) {
+    console.log(`\n🔄 Starting enrichment iteration ${iteration}`);
+    console.log(`⏰ ${new Date().toISOString()}`);
+    
+    try {
+      await bulkEnrichmentSimple();
+    } catch (error) {
+      console.error(`❌ Iteration ${iteration} failed:`, error);
+    }
+    
+    console.log(`\n⏳ Waiting 10 minutes before next iteration...`);
+    console.log(`⏰ Next run at: ${new Date(Date.now() + 10 * 60 * 1000).toISOString()}`);
+    
+    // Wait 10 minutes (10 * 60 * 1000 milliseconds)
+    await new Promise((resolve) => setTimeout(resolve, 10 * 60 * 1000));
+    
+    iteration++;
+  }
+}
+
+// Run the periodic enrichment
+runPeriodicEnrichment().catch(console.error);
