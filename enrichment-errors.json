@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-08-08T14:37:55.499Z",
+  "errors": [
+    {
+      "transactionId": "0x7df18a809e53b6244356ef8c97e24acff017109ee3423df02d80270c2dff1360",
+      "error": "Error: ❌ Error fetching price data: Error: Both pairs failed: HTTP 400 on https://pair-pricing.la-tribu.xyz/api/price?inputToken=TURBO&outputToken=WETH&timestamp=1742334879: Bad Request\n    at PriceService.fetchPriceData (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\services\\priceService.ts:240:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async bulkEnrichmentSimple (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\scripts\\bulkEnrichmentSimple.ts:66:27)\n    at PriceService.fetchPriceData (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\services\\priceService.ts:245:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async bulkEnrichmentSimple (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\scripts\\bulkEnrichmentSimple.ts:66:27)",
+      "timestamp": "2025-08-08T14:37:53.263Z",
+      "inputToken": "0xa35923162c49cf95e6bf26623385eb431ad920d3",
+      "outputToken": "0x0000000000000000000000000000000000000000",
+      "decayStartTime": 1742334879
+    },
+    {
+      "transactionId": "0x8cdd5bce6c9c4993d9419c8c544219c1a18d3eea5f2d6e1f74f5414eab488dc3",
+      "error": "Error: ❌ Error fetching price data: Error: Both pairs failed: HTTP 400 on https://pair-pricing.la-tribu.xyz/api/price?inputToken=USDC&outputToken=WETH&timestamp=1742334465: Bad Request\n    at PriceService.fetchPriceData (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\services\\priceService.ts:240:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async bulkEnrichmentSimple (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\scripts\\bulkEnrichmentSimple.ts:66:27)\n    at PriceService.fetchPriceData (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\services\\priceService.ts:245:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async bulkEnrichmentSimple (C:\\Users\\elden\\repositories\\uni-x-visualiser\\src\\scripts\\bulkEnrichmentSimple.ts:66:27)",
+      "timestamp": "2025-08-08T14:37:54.997Z",
+      "inputToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "outputToken": "0x0000000000000000000000000000000000000000",
+      "decayStartTime": 1742334465
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "enriched": 1,
+    "failed": 2,
+    "skipped": 0,
+    "successRate": "33.33%"
+  }
+}

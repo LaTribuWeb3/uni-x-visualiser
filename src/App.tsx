@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 
-import { format, fromUnixTime, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
-import { getTokenName, getTokenDecimals, formatVolume } from './utils';
+import { format } from 'date-fns';
+import { getTokenName, formatVolume } from './utils';
 import TransactionsTable from './TransactionsTable';
 import FileUpload from './components/FileUpload';
 import apiService from './services/api';
-import type { Transaction } from './types/Transaction';
 import './App.css';
 
 
@@ -74,18 +73,11 @@ const Navigation: React.FC = () => {
 
 // Dashboard component (existing App logic)
 const Dashboard: React.FC = () => {
-  const [data, setData] = useState<Transaction[]>([]);
-  const [filteredData, setFilteredData] = useState<Transaction[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [dataRange, setDataRange] = useState<{ min: Date; max: Date } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [metadata, setMetadata] = useState<{
-    totalCount: number;
-    dateRange: { min: Date | null; max: Date | null };
-    uniqueTokens: { inputTokens: string[]; outputTokens: string[] };
-  } | null>(null);
   const [statistics, setStatistics] = useState<{
     totalTransactions: number;
     tokenStats: {
@@ -116,7 +108,6 @@ const Dashboard: React.FC = () => {
         
         // Load metadata (counts, date ranges, unique tokens)
         const metadataResult = await apiService.getMetadata();
-        setMetadata(metadataResult);
         
         if (metadataResult.totalCount === 0) {
           setError('No data found in database. Please run the CSV import script first.');
@@ -179,24 +170,6 @@ const Dashboard: React.FC = () => {
 
     updateStatistics();
   }, [startDate, endDate]);
-
-  // Filter data based on date range
-  useEffect(() => {
-    if (!data.length || !startDate || !endDate) {
-      setFilteredData(data);
-      return;
-    }
-
-    const start = startOfDay(new Date(startDate));
-    const end = endOfDay(new Date(endDate));
-
-    const filtered = data.filter(transaction => {
-      const transactionDate = fromUnixTime(parseInt(transaction.decayStartTime));
-      return isWithinInterval(transactionDate, { start, end });
-    });
-
-    setFilteredData(filtered);
-  }, [data, startDate, endDate]);
 
 
 
