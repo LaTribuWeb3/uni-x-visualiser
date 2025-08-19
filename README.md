@@ -1,4 +1,16 @@
-# React + TypeScript + Vite
+# Uni-X Visualizer
+
+A React + TypeScript + Vite application for visualizing and managing transaction data with price enrichment capabilities.
+
+## Features
+
+- **Dashboard**: View transaction statistics and analytics
+- **File Upload**: Upload CSV files with real-time progress tracking
+- **Transactions Table**: Browse and filter transaction data
+- **Price Enrichment**: Automated price data enrichment for transactions
+- **Standalone Enrichment Daemon**: Generate standalone executables for VM deployment
+
+## Development
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
@@ -67,3 +79,46 @@ export default tseslint.config([
   },
 ])
 ```
+
+## Standalone Enrichment Daemon
+
+The project includes scripts to generate standalone executables for the price enrichment daemon that can be deployed on VMs without requiring Node.js installation.
+
+### Available Scripts
+
+- `npm run build-enrichment`: Compiles the TypeScript enrichment script to JavaScript
+- `npm run clean-enrichment`: Cleans the build artifacts
+- `npm run package-enrichment`: Generates standalone executables for multiple platforms
+
+### Generating Standalone Executables
+
+To create standalone executables for VM deployment:
+
+```bash
+npm run package-enrichment
+```
+
+This will generate the following files in `dist/executables/`:
+- `enrichment-daemon-win.exe` (Windows x64)
+- `enrichment-daemon-linux` (Linux x64)
+- `enrichment-daemon-macos` (macOS x64)
+
+### Deployment
+
+1. Copy the appropriate executable to your VM
+2. Create a `.env` file with your configuration:
+   ```
+   MONGODB_URI=mongodb://your-mongodb-connection
+   DB_NAME=uni-x-visualiser
+   COLLECTION_NAME=transactions
+   ```
+3. Run the executable:
+   ```bash
+   # Linux/macOS
+   ./enrichment-daemon-linux
+   
+   # Windows
+   enrichment-daemon-win.exe
+   ```
+
+The daemon will run continuously, enriching transaction prices every 10 minutes.
