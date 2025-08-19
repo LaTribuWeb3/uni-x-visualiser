@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "dist/scripts",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/scripts/bulkEnrichment.ts",
+    "src/services/priceService.ts",
+    "src/types/Transaction.ts",
+    "src/assets/tokens.ts",
+    "src/utils/tokenTranslations.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
