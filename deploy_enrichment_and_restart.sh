@@ -13,9 +13,9 @@ ssh-add -l
 
 echo "Copying files"
 
-scp -vvv package.json root@91.98.78.13:/opt/bulk-enrichment
-scp -vvv -r dist/scripts root@91.98.78.13:/opt/bulk-enrichment
-ssh -vvv root@91.98.78.13 "pm2 restart bulkEnrichment"
+scp -vvv -o StrictHostKeyChecking=no package.json root@91.98.78.13:/opt/bulk-enrichment
+scp -vvv -o StrictHostKeyChecking=no -r dist/scripts root@91.98.78.13:/opt/bulk-enrichment
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart bulkEnrichment"
 
 echo "Cleanup ssh agent"
 
