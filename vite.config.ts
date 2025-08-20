@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_MONGODB_URI': JSON.stringify(env.MONGODB_URI),
       'import.meta.env.VITE_DB_NAME': JSON.stringify(env.DB_NAME),
       'import.meta.env.VITE_COLLECTION_NAME': JSON.stringify(env.COLLECTION_NAME),
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL),
     },
     optimizeDeps: {
       force: true,
