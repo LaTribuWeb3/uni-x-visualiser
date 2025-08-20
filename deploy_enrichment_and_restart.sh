@@ -19,6 +19,7 @@ ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "cd /opt/uni-x-visualiser 
 echo "Removing package.json"
 
 ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "rm /opt/uni-x-visualiser/package.json"
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "rm /opt/uni-x-visualiser/package-lock.json"
 
 echo "Copying ecosystem.config.js and dist"
 
