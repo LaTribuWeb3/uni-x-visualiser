@@ -13,9 +13,10 @@ ssh-add -l
 
 echo "Copying files"
 
-scp -vvv -o StrictHostKeyChecking=no package.json root@91.98.78.13:/opt/bulk-enrichment
-scp -vvv -o StrictHostKeyChecking=no -r dist/scripts root@91.98.78.13:/opt/bulk-enrichment
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart bulkEnrichment"
+scp -vvv -o StrictHostKeyChecking=no package.json root@91.98.78.13:/opt/uni-x-visualiser
+scp -vvv -o StrictHostKeyChecking=no ecosystem.config.js root@91.98.78.13:/opt/uni-x-visualiser
+scp -vvv -o StrictHostKeyChecking=no -r dist root@91.98.78.13:/opt/uni-x-visualiser
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart /opt/uni-x-visualiser/ecosystem.config.js"
 
 echo "Cleanup ssh agent"
 
