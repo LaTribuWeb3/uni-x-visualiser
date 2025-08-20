@@ -11,9 +11,17 @@ echo "Verifying private keys"
 # List out your new key's fingerprint
 ssh-add -l
 
-echo "Copying files"
+echo "Copying package.json and installing dependencies"
 
 scp -vvv -o StrictHostKeyChecking=no package.json root@91.98.78.13:/opt/uni-x-visualiser
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "cd /opt/uni-x-visualiser && npm install"
+
+echo "Removing package.json"
+
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "rm /opt/uni-x-visualiser/package.json"
+
+echo "Copying ecosystem.config.js and dist"
+
 scp -vvv -o StrictHostKeyChecking=no ecosystem.config.js root@91.98.78.13:/opt/uni-x-visualiser
 scp -vvv -o StrictHostKeyChecking=no -r dist root@91.98.78.13:/opt/uni-x-visualiser
 scp -vvv -o StrictHostKeyChecking=no .env root@91.98.78.13:/opt/uni-x-visualiser
