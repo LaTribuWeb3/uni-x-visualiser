@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "dist/backend",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": [
+    "src/backend.ts",
+    "src/services/priceService.ts",
+    "src/types/**/*",
+    "src/utils/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/scripts/**/*",
+    "src/components/**/*",
+    "src/App.tsx",
+    "src/main.tsx"
+  ]
+}

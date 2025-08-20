@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      emptyOutDir: false
+    },
     define: {
       'import.meta.env.VITE_MONGODB_URI': JSON.stringify(env.MONGODB_URI),
       'import.meta.env.VITE_DB_NAME': JSON.stringify(env.DB_NAME),

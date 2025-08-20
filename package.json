@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build-all": "npm run clean && npm run build-enrichment && npm run build-backend && npm run build",
+    "clean": "rimraf dist",
+    "build-backend": "tsc -p tsconfig.backend.json",
+    "build-enrichment": "tsc -p tsconfig.enrichment.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "start-ui": "vite",
     "start-backend": "npx tsx src/backend.ts",
-    "enrich-all": "npx tsx src/scripts/bulkEnrichment.ts",
-    "build-enrichment": "tsc -p tsconfig.enrichment.json"
+    "enrich-all": "npx tsx src/scripts/bulkEnrichment.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
