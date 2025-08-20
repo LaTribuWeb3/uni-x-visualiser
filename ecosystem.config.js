@@ -55,6 +55,11 @@ module.exports = {
     {
       name: 'bulk-enrichment',
       script: 'dist/scripts/bulkEnrichment.js',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 5000,
+        FRONTEND_URL: 'https://feature-mongo-db.uni-x-visualiser.pages.dev'
+      },
       instances: 1,
       autorestart: true,
       watch: false,

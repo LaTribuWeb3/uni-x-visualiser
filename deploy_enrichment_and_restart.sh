@@ -61,9 +61,9 @@ if [ ! -z \"\$ENV_VARS\" ]; then
     awk -v env_vars=\"\$ENV_VARS\" '
     /env: {/ {
         print \"      env: {\"
-        print \"        NODE_ENV: 'production',\"
+        print \"        NODE_ENV: '\''production'\'',\"
         print \"        PORT: 5000,\"
-        print \"        FRONTEND_URL: 'https://feature-mongo-db.uni-x-visualiser.pages.dev',\"
+        print \"        FRONTEND_URL: '\''https://feature-mongo-db.uni-x-visualiser.pages.dev'\'',\"
         printf \"%s\", env_vars
         print \"      },\"
         # Skip the original env block
@@ -74,9 +74,9 @@ if [ ! -z \"\$ENV_VARS\" ]; then
     }
     /env_production: {/ {
         print \"      env_production: {\"
-        print \"        NODE_ENV: 'production',\"
+        print \"        NODE_ENV: '\''production'\'',\"
         print \"        PORT: 5000,\"
-        print \"        FRONTEND_URL: 'https://feature-mongo-db.uni-x-visualiser.pages.dev',\"
+        print \"        FRONTEND_URL: '\''https://feature-mongo-db.uni-x-visualiser.pages.dev'\'',\"
         printf \"%s\", env_vars
         print \"      },\"
         # Skip the original env_production block
@@ -96,7 +96,7 @@ else
 fi
 "
 
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart /opt/uni-x-visualiser/ecosystem.config.js"
+# ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart /opt/uni-x-visualiser/ecosystem.config.js"
 
 echo "Cleanup ssh agent"
 
