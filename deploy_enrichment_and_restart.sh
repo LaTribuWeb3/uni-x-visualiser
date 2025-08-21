@@ -105,7 +105,8 @@ else
 fi
 "
 
-# ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 restart /opt/uni-x-visualiser/ecosystem.config.js"
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 stop /opt/uni-x-visualiser/ecosystem.config.js"
+ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 start /opt/uni-x-visualiser/ecosystem.config.js"
 
 echo "Cleanup ssh agent"
 
