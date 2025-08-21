@@ -11,6 +11,8 @@ import Papa from 'papaparse';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
+import { tokens } from './assets/tokens';
+
 // Load environment variables
 dotenv.config();
 const app = express();
@@ -1046,8 +1048,8 @@ app.get('/api/transactions/statistics', async (req, res) => {
     const statistics = {
       totalTransactions: filteredCount,
       tokenStats: tokenStats.length > 0 ? {
-        totalInputVolume: tokenStats[0].totalInputVolume,
-        totalOutputVolume: tokenStats[0].totalOutputVolume,
+        totalInputVolume: tokenStats[0].totalInputVolume / 10 ** (tokens.find(t => t.address === tokenStats[0].inputTokenAddress)?.decimals || 18),
+        totalOutputVolume: tokenStats[0].totalOutputVolume / 10 ** (tokens.find(t => t.address === tokenStats[0].outputTokenAddress)?.decimals || 18),
         uniqueInputTokens: tokenStats[0].uniqueInputTokens.length,
         uniqueOutputTokens: tokenStats[0].uniqueOutputTokens.length
       } : {
