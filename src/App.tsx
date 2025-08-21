@@ -327,7 +327,16 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Output Volume</h3>
-            <p className="text-3xl font-bold text-orange-600">{summaryStats?.totalOutputVolume.toLocaleString() || '0'}</p>
+            <p className="text-3xl font-bold text-orange-600">
+              {summaryStats?.totalOutputVolume ? (
+                <span 
+                  className="cursor-help" 
+                  title={formatVolume(summaryStats.totalOutputVolume).full}
+                >
+                  {formatVolume(summaryStats.totalOutputVolume).display}
+                </span>
+              ) : '0'}
+            </p>
           </div>
         </div>
 
