@@ -13,24 +13,26 @@ ssh-add -l
 
 echo "Copying package.json and installing dependencies"
 
-scp -vvv -o StrictHostKeyChecking=no package.json root@91.98.78.13:/opt/uni-x-visualiser
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "cd /opt/uni-x-visualiser && npm install"
+SSH_OPTIONS="-o StrictHostKeyChecking=no"
+
+scp $SSH_OPTIONS package.json root@91.98.78.13:/opt/uni-x-visualiser
+ssh $SSH_OPTIONS root@91.98.78.13 "cd /opt/uni-x-visualiser && npm install"
 
 echo "Removing package.json"
 
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "rm /opt/uni-x-visualiser/package.json"
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "rm /opt/uni-x-visualiser/package-lock.json"
+ssh $SSH_OPTIONS root@91.98.78.13 "rm /opt/uni-x-visualiser/package.json"
+ssh $SSH_OPTIONS root@91.98.78.13 "rm /opt/uni-x-visualiser/package-lock.json"
 
 echo "Copying ecosystem.config.js and dist"
 
-scp -vvv -o StrictHostKeyChecking=no ecosystem.config.js root@91.98.78.13:/opt/uni-x-visualiser
-scp -vvv -o StrictHostKeyChecking=no -r dist root@91.98.78.13:/opt/uni-x-visualiser
-scp -vvv -o StrictHostKeyChecking=no .env root@91.98.78.13:/opt/uni-x-visualiser
+scp $SSH_OPTIONS ecosystem.config.js root@91.98.78.13:/opt/uni-x-visualiser
+scp $SSH_OPTIONS -r dist root@91.98.78.13:/opt/uni-x-visualiser
+scp $SSH_OPTIONS .env root@91.98.78.13:/opt/uni-x-visualiser
 
 echo "Reading .env file and updating ecosystem.config.js on remote machine"
 
 # Execute the environment variable update on the remote machine
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "
+ssh $SSH_OPTIONS root@91.98.78.13 "
 cd /opt/uni-x-visualiser
 
 echo 'Reading .env file and updating ecosystem.config.js...'
@@ -105,8 +107,8 @@ else
 fi
 "
 
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 stop /opt/uni-x-visualiser/ecosystem.config.js"
-ssh -vvv -o StrictHostKeyChecking=no root@91.98.78.13 "pm2 start /opt/uni-x-visualiser/ecosystem.config.js"
+ssh $SSH_OPTIONS root@91.98.78.13 "pm2 stop /opt/uni-x-visualiser/ecosystem.config.js"
+ssh $SSH_OPTIONS root@91.98.78.13 "cd /opt/uni-x-visualiser; pm2 start ecosystem.config.js"
 
 echo "Cleanup ssh agent"
 
